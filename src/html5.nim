@@ -44,7 +44,7 @@ proc processChilds(tags: TTable[string, TTagHandling], node: string,
                         if mode == blockMode: depth + 1 else: 0, target, mode)
         of nnkStmtList:
             processChilds(tags, node, child, depth, target, mode)
-        of nnkStrLit, nnkInfix:
+        of nnkStrLit, nnkTripleStrLit, nnkInfix:
             if mode == unknown:
                 mode = flowmode
             target.add(newCall("add", newIdentNode("result"),
@@ -68,10 +68,13 @@ proc processChilds(tags: TTable[string, TTagHandling], node: string,
                     ifCond.add(ifContent)
                     ifNode.add(ifCond)
                 of nnkElse:
-                    var elseContent = newNimNode(nnkStmtList, ifBranch)
+                    var
+                        elseCond    = newNimNode(nnkElse, ifBranch)
+                        elseContent = newNimNode(nnkStmtList, ifBranch)
                     processChilds(tags, node, ifBranch[0], depth, elseContent,
                                   mode)
-                    ifNode.add(elseContent)
+                    elseCond.add(elseContent)
+                    ifNode.add(elseCond)
                 else:
                     quit "The nimrod parser should not allow this…"
             target.add(ifNode)
@@ -97,6 +100,7 @@ proc identName(node: PNimrodNode): string {.compileTime, inline.} =
 proc processNode(tags: TTable[string, TTagHandling], parent: PNimrodNode,
                  depth: int, target : var PNimrodNode, mode: TOutputMode) =
     ## Process one node the represents an HTML tag in the source tree.
+    echo treeRepr(parent)
     let
         globalAttributes : TSet[string] = toSet([
                 "acceskey", "contenteditable", "contextmenu", "dir",
@@ -152,8 +156,7 @@ proc processNode(tags: TTable[string, TTagHandling], parent: PNimrodNode,
                            newStrLitNode(" class=\"" & classString & "\"")))
 
     while childIndex < parent.len and parent[childIndex].kind == nnkExprEqExpr:
-        assert(parent[childIndex][0].kind == nnkIdent)
-        let childName = $parent[childIndex][0].ident
+        let childName = identName(parent[childIndex][0])
         if not (childName in globalAttributes or
                 childName in tagProps.requiredAttrs or
                 childName in tagProps.optionalAttrs):
@@ -201,17 +204,67 @@ macro html5*(params : openarray[stmt]): stmt {.immediate.} =
 
     var
         tags : TTagList = initTable[string, TTagHandling]()
-    tags["html"] = (requiredAttrs  : initSet[string](),
+    tags["body"] = (requiredAttrs  : initSet[string](),
                     optionalAttrs  : initSet[string](),
-                    requiredChilds : toSet[string](["head", "body"]),
+                    requiredChilds : initSet[string](),
                     optionalChilds : initSet[string](),
                     instaClosable  : false)
+    tags["div"] = (requiredAttrs  : initSet[string](),
+                   optionalAttrs  : initSet[string](),
+                   requiredChilds : initSet[string](),
+                   optionalChilds : initSet[string](),
+                   instaClosable  : false)
+    tags["h1"] = (requiredAttrs  : initSet[string](),
+                  optionalAttrs  : initSet[string](),
+                  requiredChilds : initSet[string](),
+                  optionalChilds : initSet[string](),
+                  instaClosable  : false)
+    tags["h2"] = (requiredAttrs  : initSet[string](),
+                  optionalAttrs  : initSet[string](),
+                  requiredChilds : initSet[string](),
+                  optionalChilds : initSet[string](),
+                  instaClosable  : false)
+    tags["h3"] = (requiredAttrs  : initSet[string](),
+                  optionalAttrs  : initSet[string](),
+                  requiredChilds : initSet[string](),
+                  optionalChilds : initSet[string](),
+                  instaClosable  : false)
+    tags["h4"] = (requiredAttrs  : initSet[string](),
+                  optionalAttrs  : initSet[string](),
+                  requiredChilds : initSet[string](),
+                  optionalChilds : initSet[string](),
+                  instaClosable  : false)
+    tags["h5"] = (requiredAttrs  : initSet[string](),
+                  optionalAttrs  : initSet[string](),
+                  requiredChilds : initSet[string](),
+                  optionalChilds : initSet[string](),
+                  instaClosable  : false)
+    tags["h6"] = (requiredAttrs  : initSet[string](),
+                  optionalAttrs  : initSet[string](),
+                  requiredChilds : initSet[string](),
+                  optionalChilds : initSet[string](),
+                  instaClosable  : false)
     tags["head"] = (requiredAttrs  : initSet[string](),
                     optionalAttrs  : initSet[string](),
                     requiredChilds : toSet[string](["title"]),
                     optionalChilds : initSet[string](),
                     instaClosable  : false)
-    tags["body"] = (requiredAttrs  : initSet[string](),
+    tags["html"] = (requiredAttrs  : initSet[string](),
+                    optionalAttrs  : initSet[string](),
+                    requiredChilds : toSet[string](["head", "body"]),
+                    optionalChilds : initSet[string](),
+                    instaClosable  : false)
+    tags["p"] = (requiredAttrs  : initSet[string](),
+                 optionalAttrs  : initSet[string](),
+                 requiredChilds : initSet[string](),
+                 optionalChilds : initSet[string](),
+                 instaClosable  : false)
+    tags["script"] = (requiredAttrs : initSet[string](),
+                      optionalAttrs : toSet(["type"]),
+                      requiredChilds: initSet[string](),
+                      optionalChilds: initSet[string](),
+                      instaClosable : false)
+    tags["span"] = (requiredAttrs  : initSet[string](),
                     optionalAttrs  : initSet[string](),
                     requiredChilds : initSet[string](),
                     optionalChilds : initSet[string](),
@@ -221,16 +274,7 @@ macro html5*(params : openarray[stmt]): stmt {.immediate.} =
                       requiredChilds : initSet[string](),
                       optionalChilds : initSet[string](),
                       instaClosable  : false)
-    tags["div"] = (requiredAttrs  : initSet[string](),
-                   optionalAttrs  : initSet[string](),
-                   requiredChilds : initSet[string](),
-                   optionalChilds : initSet[string](),
-                   instaClosable  : false)
-    tags["span"] = (requiredAttrs  : initSet[string](),
-                    optionalAttrs  : initSet[string](),
-                    requiredChilds : initSet[string](),
-                    optionalChilds : initSet[string](),
-                    instaClosable  : false)
+
 
     result = newNimNode(nnkStmtList, params[0])
     result.add(newCall("add", newIdentNode("result"),
@@ -243,28 +287,4 @@ macro html5*(params : openarray[stmt]): stmt {.immediate.} =
         dummyChild.add(params[i])
     dummyParent.add(dummyChild)
     processNode(tags, dummyParent, 0, result, blockmode)
-
-
-proc test(): string =
-    result = ""
-    var foobar = "herpderp"
-    var bla = 3
-    html5:
-        head (id = "head"):
-            title: "bar"
-        body.main (id = foobar):
-            span:
-                "foo" & "foo"
-                if bla > 3:
-                    "bar"
-                else:
-                    "bra"
-                var blubb = 13
-                for i in 1..5:
-                    "n"
-            `div`:
-                "mi"
-            d.content:
-                "dididi"
-
-echo test()
+    echo "---\n" & treeRepr(result)
