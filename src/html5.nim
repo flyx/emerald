@@ -13,17 +13,24 @@ type
     TOutputMode = enum
         unknown, blockmode, flowmode
 
-proc processAttribute(tags : TTable[string, TTagHandling],
-                      name : string, value: PNimrodNode, target : var PNimrodNode) {.compileTime.} =
-    target.add(newCall("add", newIdentNode("result"), newStrLitNode(" " & name & "=\"")))
+proc processAttribute(tags: TTable[string, TTagHandling],
+                      name: string, value: PNimrodNode,
+                      target : var PNimrodNode) {.compileTime.} =
+    ## generate code that adds an HTML tag attribute to the output
+    target.add(newCall("add", newIdentNode("result"),
+                       newStrLitNode(" " & name & "=\"")))
     target.add(newCall("add", newIdentNode("result"), copyNimTree(value)))
     target.add(newCall("add", newIdentNode("result"), newStrLitNode("\"")))
 
-proc processNode(tags: TTable[string, TTagHandling], parent: PNimrodNode, depth: int, target : var PNimrodNode) {.compileTime.}
+proc processNode(tags: TTable[string, TTagHandling], parent: PNimrodNode,
+                 depth: int, target : var PNimrodNode,
+                 mode: TOutputMode) {.compileTime.}
 
 proc processChilds(tags: TTable[string, TTagHandling], node: string,
                    parent: PNimrodNode, depth: int, target : var PNimrodNode,
                    mode  : var TOutputMode) {.compileTime.} =
+    ## Called on a nnkStmtList. Process all child nodes of the lists, parse
+    ## supported structures, generate the code of the compiled template.
     for child in parent.children:
         case child.kind:
         of nnkEmpty, nnkFormalParams:
@@ -31,14 +38,17 @@ proc processChilds(tags: TTable[string, TTagHandling], node: string,
         of nnkCall:
             if mode == unknown:
                 mode = blockmode
-                target.add(newCall("add", newIdentNode("result"), newStrLitNode("\n")))
-            processNode(tags, child, if mode == blockMode: depth + 1 else: 0, target)
+                target.add(newCall("add", newIdentNode("result"),
+                                   newStrLitNode("\n")))
+            processNode(tags, child,
+                        if mode == blockMode: depth + 1 else: 0, target, mode)
         of nnkStmtList:
             processChilds(tags, node, child, depth, target, mode)
         of nnkStrLit, nnkInfix:
             if mode == unknown:
                 mode = flowmode
-            target.add(newCall("add", newIdentNode("result"), copyNimTree(child)))
+            target.add(newCall("add", newIdentNode("result"),
+                               copyNimTree(child)))
         of nnkIfStmt:
             assert child[0].kind == nnkElifBranch
             assert child[0][1].kind == nnkStmtList
@@ -53,12 +63,14 @@ proc processChilds(tags: TTable[string, TTagHandling], node: string,
                         ifCond = newNimNode(nnkElifBranch, ifBranch)
                         ifContent = newNimNode(nnkStmtList, ifBranch[1])
                     ifCond.add(copyNimTree(ifBranch[0]))
-                    processChilds(tags, node, ifBranch[1], depth, ifContent, mode)
+                    processChilds(tags, node, ifBranch[1], depth, ifContent,
+                                  mode)
                     ifCond.add(ifContent)
                     ifNode.add(ifCond)
                 of nnkElse:
                     var elseContent = newNimNode(nnkStmtList, ifBranch)
-                    processChilds(tags, node, ifBranch[0], depth, elseContent, mode)
+                    processChilds(tags, node, ifBranch[0], depth, elseContent,
+                                  mode)
                     ifNode.add(elseContent)
                 else:
                     quit "The nimrod parser should not allow this…"
@@ -76,12 +88,15 @@ proc processChilds(tags: TTable[string, TTagHandling], node: string,
             quit "Unexpected node type (" & $child.kind & ")"
 
 proc identName(node: PNimrodNode): string {.compileTime, inline.} =
-    if node.kind == nnkAccQuoted:
-        return $node[0]
-    else:
-        return $node
+    ## Used to be able to parse accent-quoted HTML tags as well.
+    ## A prominent HTML tag is <div>, which is a keyword in Nimrod.
+    ## You can either escape it with ``, or simply use "d" as a substitute.
+    let name: string = if node.kind == nnkAccQuoted: $node[0] else: $node
+    return if name == "d": "div" else: name
 
-proc processNode(tags: TTable[string, TTagHandling], parent: PNimrodNode, depth: int, target : var PNimrodNode) =
+proc processNode(tags: TTable[string, TTagHandling], parent: PNimrodNode,
+                 depth: int, target : var PNimrodNode, mode: TOutputMode) =
+    ## Process one node the represents an HTML tag in the source tree.
     let
         globalAttributes : TSet[string] = toSet([
                 "acceskey", "contenteditable", "contextmenu", "dir",
@@ -113,13 +128,15 @@ proc processNode(tags: TTable[string, TTagHandling], parent: PNimrodNode, depth:
     if not tags.hasKey(name):
         quit "Unknown HTML tag: " & name
 
-
     let tagProps = tags[name]
 
-    echo "processing content:"
-    echo treeRepr(parent)
-
-    target.add(newCall("add", newIdentNode("result"), newStrLitNode(repeatChar(4 * depth, ' ') & "<" & name)))
+    if mode == blockmode:
+        target.add(newCall("add", newIdentNode("result"),
+                           newStrLitNode(repeatChar(4 * depth, ' ') &
+                           "<" & name)))
+    else:
+        target.add(newCall("add", newIdentNode("result"),
+                           newStrLitNode("<" & name)))
 
     if classes.len > 0:
         var
@@ -131,7 +148,8 @@ proc processNode(tags: TTable[string, TTagHandling], parent: PNimrodNode, depth:
             else:
                 classString.add(" ")
             classString.add(class)
-        target.add(newCall("add", newIdentNode("result"), newStrLitNode(" class=\"" & classString & "\"")))
+        target.add(newCall("add", newIdentNode("result"),
+                           newStrLitNode(" class=\"" & classString & "\"")))
 
     while childIndex < parent.len and parent[childIndex].kind == nnkExprEqExpr:
         assert(parent[childIndex][0].kind == nnkIdent)
@@ -139,7 +157,8 @@ proc processNode(tags: TTable[string, TTagHandling], parent: PNimrodNode, depth:
         if not (childName in globalAttributes or
                 childName in tagProps.requiredAttrs or
                 childName in tagProps.optionalAttrs):
-            quit "Attribute \"" & childName & "\" not allowed in tag \"" & name & "\""
+            quit "Attribute \"" & childName &
+                 "\" not allowed in tag \"" & name & "\""
         if childName in parsedAttributes:
             quit "Duplicate attribute: " & childName
         parsedAttributes.incl(childName)
@@ -154,21 +173,32 @@ proc processNode(tags: TTable[string, TTagHandling], parent: PNimrodNode, depth:
             missing.excl(item)
         for item in missing:
             msg.add(item & ", ")
-        quit "The following mandatory attributes are missing on tag \"" & name & "\": " & msg
+        quit "The following mandatory attributes are missing on tag \"" &
+             name & "\": " & msg
 
     target.add(newCall("add", newIdentNode("result"), newStrLitNode(">")))
 
-    var mode: TOutputMode = unknown
+    var childMode: TOutputMode = unknown
 
-    processChilds(tags, name, parent[childIndex], depth, target, mode)
-    if mode == blockmode:
-        target.add(newCall("add", newIdentNode("result"), newStrLitNode("\n" & repeatChar(4 * depth, ' ') & "</" & name & ">\n")))
+    processChilds(tags, name, parent[childIndex], depth, target, childMode)
+    if childMode == blockmode:
+        target.add(newCall("add", newIdentNode("result"),
+                           newStrLitNode(repeatChar(4 * depth, ' ') &
+                                         "</" & name & ">")))
     else:
-        target.add(newCall("add", newIdentNode("result"), newStrLitNode("</" & name & ">")))
-    echo "---"
+        target.add(newCall("add", newIdentNode("result"),
+                           newStrLitNode("</" & name & ">")))
+    if mode == blockmode:
+        target.add(newCall("add", newIdentNode("result"),
+                           newStrLitNode("\n")))
 
 
 macro html5*(params : openarray[stmt]): stmt {.immediate.} =
+    ## parse the child tree of this node as HTML template. The macro
+    ## transforms the template into Nimrod code. Currently,
+    ## it is assumed that a variable "result" exists, and the generated
+    ## code will append its output to this variable.
+
     var
         tags : TTagList = initTable[string, TTagHandling]()
     tags["html"] = (requiredAttrs  : initSet[string](),
@@ -196,9 +226,15 @@ macro html5*(params : openarray[stmt]): stmt {.immediate.} =
                    requiredChilds : initSet[string](),
                    optionalChilds : initSet[string](),
                    instaClosable  : false)
+    tags["span"] = (requiredAttrs  : initSet[string](),
+                    optionalAttrs  : initSet[string](),
+                    requiredChilds : initSet[string](),
+                    optionalChilds : initSet[string](),
+                    instaClosable  : false)
 
     result = newNimNode(nnkStmtList, params[0])
-    result.add(newCall("add", newIdentNode("result"), newStrLitNode("<!doctype html>\n")))
+    result.add(newCall("add", newIdentNode("result"),
+                       newStrLitNode("<!doctype html>\n")))
 
     var dummyParent = newNimNode(nnkCall, params[0])
     dummyParent.add(newIdentNode("html"))
@@ -206,7 +242,7 @@ macro html5*(params : openarray[stmt]): stmt {.immediate.} =
     for i in 0 .. (params.len - 1):
         dummyChild.add(params[i])
     dummyParent.add(dummyChild)
-    processNode(tags, dummyParent, 0, result)
+    processNode(tags, dummyParent, 0, result, blockmode)
 
 
 proc test(): string =
@@ -217,15 +253,18 @@ proc test(): string =
         head (id = "head"):
             title: "bar"
         body.main (id = foobar):
-            "foo" & "foo"
-            if bla > 3:
-                "bar"
-            else:
-                "bra"
-            var blubb = 13
-            for i in 1..5:
-                "n"
+            span:
+                "foo" & "foo"
+                if bla > 3:
+                    "bar"
+                else:
+                    "bra"
+                var blubb = 13
+                for i in 1..5:
+                    "n"
             `div`:
                 "mi"
+            d.content:
+                "dididi"
 
 echo test()
