@@ -35,10 +35,10 @@ proc processChilds(tags: TTable[string, TTagHandling], node: string,
             processNode(tags, child, if mode == blockMode: depth + 1 else: 0, target)
         of nnkStmtList:
             processChilds(tags, node, child, depth, target, mode)
-        of nnkStrLit:
+        of nnkStrLit, nnkInfix:
             if mode == unknown:
                 mode = flowmode
-            target.add(newCall("add", newIdentNode("result"), newStrLitNode(child.strVal)))
+            target.add(newCall("add", newIdentNode("result"), copyNimTree(child)))
         of nnkIfStmt:
             assert child[0].kind == nnkElifBranch
             assert child[0][1].kind == nnkStmtList
@@ -63,8 +63,23 @@ proc processChilds(tags: TTable[string, TTagHandling], node: string,
                 else:
                     quit "The nimrod parser should not allow this…"
             target.add(ifNode)
+        of nnkForStmt:
+            var
+                forNode = copyNimTree(child)
+                forContent = newNimNode(nnkStmtList, child)
+            processChilds(tags, node, child[2], depth, forContent, mode)
+            forNode[2] = forContent
+            target.add(forNode)
+        of nnkVarSection:
+            target.add(copyNimNode(child))
         else:
             quit "Unexpected node type (" & $child.kind & ")"
+
+proc identName(node: PNimrodNode): string {.compileTime, inline.} =
+    if node.kind == nnkAccQuoted:
+        return $node[0]
+    else:
+        return $node
 
 proc processNode(tags: TTable[string, TTagHandling], parent: PNimrodNode, depth: int, target : var PNimrodNode) =
     let
@@ -73,17 +88,50 @@ proc processNode(tags: TTable[string, TTagHandling], parent: PNimrodNode, depth:
                 "draggable", "dropzone", "hidden", "id", "itemid",
                 "itemprop", "itemref", "itemscope", "itemtype",
                 "lang", "spellcheck", "style", "tabindex", "title"])
-        name: string = $parent[0]
-        tagProps = tags[name]
-
     var
         childIndex = 1
         parsedAttributes : TSet[string] = initSet[string]()
+        name: string = ""
+        classes: seq[string] = newSeq[string]()
+
+    case parent[0].kind:
+    of nnkIdent, nnkAccQuoted:
+        name = identName(parent[0])
+    of nnkDotExpr:
+        var first = true
+        for node in parent[0].children:
+            assert(node.kind == nnkIdent or node.kind == nnkAccQuoted)
+            if first:
+                name = identName(node)
+                first = false
+            else:
+                var className: string = identName(node)
+                add(classes, className)
+    else:
+        quit "Unexpected node type (" & $parent[0].kind & ")"
+
+    if not tags.hasKey(name):
+        quit "Unknown HTML tag: " & name
+
+
+    let tagProps = tags[name]
 
     echo "processing content:"
     echo treeRepr(parent)
 
     target.add(newCall("add", newIdentNode("result"), newStrLitNode(repeatChar(4 * depth, ' ') & "<" & name)))
+
+    if classes.len > 0:
+        var
+            first = true
+            classString = ""
+        for class in classes:
+            if first:
+                first = false
+            else:
+                classString.add(" ")
+            classString.add(class)
+        target.add(newCall("add", newIdentNode("result"), newStrLitNode(" class=\"" & classString & "\"")))
 
     while childIndex < parent.len and parent[childIndex].kind == nnkExprEqExpr:
         assert(parent[childIndex][0].kind == nnkIdent)
@@ -143,6 +191,11 @@ macro html5*(params : openarray[stmt]): stmt {.immediate.} =
                       requiredChilds : initSet[string](),
                       optionalChilds : initSet[string](),
                       instaClosable  : false)
+    tags["div"] = (requiredAttrs  : initSet[string](),
+                   optionalAttrs  : initSet[string](),
+                   requiredChilds : initSet[string](),
+                   optionalChilds : initSet[string](),
+                   instaClosable  : false)
 
     result = newNimNode(nnkStmtList, params[0])
     result.add(newCall("add", newIdentNode("result"), newStrLitNode("<!doctype html>\n")))
@@ -163,11 +216,16 @@ proc test(): string =
     html5:
         head (id = "head"):
             title: "bar"
-        body (id = foobar):
-            "foo"
+        body.main (id = foobar):
+            "foo" & "foo"
             if bla > 3:
                 "bar"
             else:
                 "bra"
+            var blubb = 13
+            for i in 1..5:
+                "n"
+            `div`:
+                "mi"
 
 echo test()
