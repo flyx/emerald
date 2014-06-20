@@ -1,4 +1,4 @@
-# NimHTML: HTML 5 templating engine for Nimrod
+# HTML 5 templating engine for Nimrod
 
 ## Overview
 
