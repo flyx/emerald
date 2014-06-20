@@ -5,15 +5,15 @@ type
     TTagHandling = tuple[requiredAttrs  : TSet[string],
                          optionalAttrs  : TSet[string],
                          requiredChilds : TSet[string],
-                         optionalChilds : TSet[string]]
+                         optionalChilds : TSet[string],
+                         instaClosable  : bool]
 
     TTagList = TTable[string, TTagHandling]
 
-proc processAttribute(tags : TTable[string, TTagHandling], name: string, child: PNimrodNode, target : var PNimrodNode) {.compileTime.} =
-    assert(child.kind == nnkExprEqExpr)
-    assert(child[0].kind == nnkIdent)
-    target.add(newCall("add", newIdentNode("result"), newStrLitNode(" " & $child[0].ident & "=\"")))
-    target.add(newCall("add", newIdentNode("result"), copyNimTree(child[1])))
+proc processAttribute(tags : TTable[string, TTagHandling],
+                      name : string, value: PNimrodNode, target : var PNimrodNode) {.compileTime.} =
+    target.add(newCall("add", newIdentNode("result"), newStrLitNode(" " & name & "=\"")))
+    target.add(newCall("add", newIdentNode("result"), copyNimTree(value)))
     target.add(newCall("add", newIdentNode("result"), newStrLitNode("\"")))
 
 proc processNode(tags: TTable[string, TTagHandling], parent: PNimrodNode, depth: int, target : var PNimrodNode) {.compileTime.}
@@ -61,16 +61,46 @@ proc processChilds(tags: TTable[string, TTagHandling], node: string, parent: PNi
     return mode == blockmode
 
 proc processNode(tags: TTable[string, TTagHandling], parent: PNimrodNode, depth: int, target : var PNimrodNode) =
-    var name: string = $parent[0]
-    var childIndex = 1
+    let
+        globalAttributes : TSet[string] = toSet([
+                "acceskey", "contenteditable", "contextmenu", "dir",
+                "draggable", "dropzone", "hidden", "id", "itemid",
+                "itemprop", "itemref", "itemscope", "itemtype",
+                "lang", "spellcheck", "style", "tabindex", "title"])
+        name: string = $parent[0]
+        tagProps = tags[name]
+
+    var
+        childIndex = 1
+        parsedAttributes : TSet[string] = initSet[string]()
+
     echo "processing content:"
     echo treeRepr(parent)
 
     target.add(newCall("add", newIdentNode("result"), newStrLitNode(repeatChar(4 * depth, ' ') & "<" & name)))
 
     while childIndex < parent.len and parent[childIndex].kind == nnkExprEqExpr:
-        processAttribute(tags, name, parent[childIndex], target)
+        assert(parent[childIndex][0].kind == nnkIdent)
+        let childName = $parent[childIndex][0].ident
+        if not (childName in globalAttributes or
+                childName in tagProps.requiredAttrs or
+                childName in tagProps.optionalAttrs):
+            quit "Attribute \"" & childName & "\" not allowed in tag \"" & name & "\""
+        if childName in parsedAttributes:
+            quit "Duplicate attribute: " & childName
+        parsedAttributes.incl(childName)
+        processAttribute(tags, childName, parent[childIndex][1], target)
         inc(childIndex)
+
+    if not (tagProps.requiredAttrs <= parsedAttributes):
+        var
+            missing = tagProps.requiredAttrs
+            msg = ""
+        for item in parsedAttributes:
+            missing.excl(item)
+        for item in missing:
+            msg.add(item & ", ")
+        quit "The following mandatory attributes are missing on tag \"" & name & "\": " & msg
 
     target.add(newCall("add", newIdentNode("result"), newStrLitNode(">")))
 
@@ -87,19 +117,23 @@ macro html5*(params : openarray[stmt]): stmt {.immediate.} =
     tags["html"] = (requiredAttrs  : initSet[string](),
                     optionalAttrs  : initSet[string](),
                     requiredChilds : toSet[string](["head", "body"]),
-                    optionalChilds : initSet[string]())
+                    optionalChilds : initSet[string](),
+                    instaClosable  : false)
     tags["head"] = (requiredAttrs  : initSet[string](),
                     optionalAttrs  : initSet[string](),
                     requiredChilds : toSet[string](["title"]),
-                    optionalChilds : initSet[string]())
+                    optionalChilds : initSet[string](),
+                    instaClosable  : false)
     tags["body"] = (requiredAttrs  : initSet[string](),
                     optionalAttrs  : initSet[string](),
                     requiredChilds : initSet[string](),
-                    optionalChilds : initSet[string]())
+                    optionalChilds : initSet[string](),
+                    instaClosable  : false)
     tags["title" ] = (requiredAttrs  : initSet[string](),
                       optionalAttrs  : initSet[string](),
                       requiredChilds : initSet[string](),
-                      optionalChilds : initSet[string]())
+                      optionalChilds : initSet[string](),
+                      instaClosable  : false)
 
     result = newNimNode(nnkStmtList, params[0])
     result.add(newCall("add", newIdentNode("result"), newStrLitNode("<!doctype html>\n")))
