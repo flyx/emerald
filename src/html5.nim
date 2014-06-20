@@ -19,10 +19,14 @@ proc processAttribute(tags : TTable[string, TTagHandling], name: string, child: 
 proc processNode(tags: TTable[string, TTagHandling], parent: PNimrodNode, depth: int, target : var PNimrodNode) {.compileTime.}
 
 proc processChilds(tags: TTable[string, TTagHandling], node: string, parent: PNimrodNode, depth: int, target : var PNimrodNode): bool {.compileTime.} =
+    type TOutputMode = enum
+        unknown, blockmode, flowmode
+
     var
         required: TTable[string, bool] = initTable[string, bool]()
         optional: TSet[string]
-        blockMode : bool = false
+        mode : TOutputMode = unknown
+    
     if not tags.hasKey(node):
         quit "Unknown tag: \"" & node & "\""
     for reqEntry in tags[node].requiredChilds:
@@ -30,25 +34,31 @@ proc processChilds(tags: TTable[string, TTagHandling], node: string, parent: PNi
     optional = tags[node].optionalChilds
 
     for child in parent.children:
-        if child.kind == nnkCall and not blockMode:
-            target.add(newCall("add", newIdentNode("result"), newStrLitNode("\n")))
-            blockMode = true
         case child.kind:
         of nnkEmpty, nnkFormalParams:
             continue
         of nnkCall:
-            processNode(tags, child, if blockMode: depth + 1 else: 0, target)
+            if mode == unknown:
+                mode = blockmode
+                target.add(newCall("add", newIdentNode("result"), newStrLitNode("\n")))
+            processNode(tags, child, if mode == blockMode: depth + 1 else: 0, target)
         of nnkStmtList:
             for statement in child.children:
                 case statement.kind:
                 of nnkStrLit:
+                    if mode == unknown:
+                        mode = flowmode
                     target.add(newCall("add", newIdentNode("result"), newStrLitNode(statement.strVal)))
                 of nnkCall:
-                    processNode(tags, statement, if blockMode: depth + 1 else: 0, target)
+                    if mode == unknown:
+                        mode = blockmode
+                        target.add(newCall("add", newIdentNode("result"), newStrLitNode("\n")))
+                    processNode(tags, statement, if mode == blockMode: depth + 1 else: 0, target)
                 else:
                     quit "Unexpected node type (" & $statement.kind & ")"
         else:
             quit "Unexpected node type (" & $child.kind & ")"
+    return mode == blockmode
 
 proc processNode(tags: TTable[string, TTagHandling], parent: PNimrodNode, depth: int, target : var PNimrodNode) =
     var name: string = $parent[0]
@@ -64,9 +74,10 @@ proc processNode(tags: TTable[string, TTagHandling], parent: PNimrodNode, depth:
 
     target.add(newCall("add", newIdentNode("result"), newStrLitNode(">")))
 
-    processChilds(tags, name, parent[childIndex], depth, target)
-
-    target.add(newCall("add", newIdentNode("result"), newStrLitNode("</" & name & ">\n")))
+    if processChilds(tags, name, parent[childIndex], depth, target):
+        target.add(newCall("add", newIdentNode("result"), newStrLitNode("\n" & repeatChar(4 * depth, ' ') & "</" & name & ">\n")))
+    else:
+        target.add(newCall("add", newIdentNode("result"), newStrLitNode("</" & name & ">")))
     echo "---"
 
 
@@ -104,10 +115,11 @@ macro html5*(params : openarray[stmt]): stmt {.immediate.} =
 
 proc test(): string =
     result = ""
+    var foobar = "herpderp"
     html5:
         head (id = "head"):
             title: "bar"
-        body:
+        body (id = foobar):
             "foo"
 
 echo test()
