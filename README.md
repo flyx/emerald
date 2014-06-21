@@ -123,16 +123,27 @@ line and adds its own indentation instead so that the output looks nice.
 
 ### Control structures
 
-`if`, `elif`, `else` and `for` work exactly as in Nimrod.
+`if`, `elif`, `else`, `for` and `while` work exactly as in Nimrod.
 
 **TODO:**
 
- * Support `while`
  * Support `case`
 
 ### Variables
 
-You can declare variables using `var` everywhere.
+You can declare variables using `var` everywhere. You can assign variables with
+a normal assignment statement everywhere. You can output variables by writing
+a statement containing only their name. Example:
+
+```nimrod
+var i = 10
+while i < 5:
+	i
+	i = i - 1
+```
+
+Note that `inc(i, -1)` doesn't work here as all non-infix calls are parsed as
+HTML tag constructors.
 
 ### HTML attributes
 

@@ -49,6 +49,13 @@ proc processChilds(tags: TTable[string, TTagHandling], node: string,
                 mode = flowmode
             target.add(newCall("add", newIdentNode("result"),
                                copyNimTree(child)))
+        of nnkIdent:
+            if mode == unknown:
+                mode = flowmode
+            var printVar = newNimNode(nnkPrefix, child)
+            printVar.add(newIdentNode("$"))
+            printVar.add(copyNimTree(child))
+            target.add(newCall("add", newIdentNode("result"), printVar))
         of nnkTripleStrLit:
             if mode == unknown:
                 mode = blockmode
@@ -105,15 +112,18 @@ proc processChilds(tags: TTable[string, TTagHandling], node: string,
                 else:
                     quit "The nimrod parser should not allow this…"
             target.add(ifNode)
-        of nnkForStmt:
+        of nnkForStmt, nnkWhileStmt:
+            let stmtIndex = if child.kind == nnkForStmt: 2 else: 1
             var
-                forNode = copyNimTree(child)
-                forContent = newNimNode(nnkStmtList, child)
-            processChilds(tags, node, child[2], depth, forContent, mode)
-            forNode[2] = forContent
-            target.add(forNode)
+                newNode = copyNimTree(child)
+                newContent = newNimNode(nnkStmtList, child)
+            processChilds(tags, node, child[stmtIndex], depth, newContent, mode)
+            newNode[stmtIndex] = newContent
+            target.add(newNode)
+        of nnkAsgn:
+            target.add(copyNimTree(child))
         of nnkVarSection:
-            target.add(copyNimNode(child))
+            target.add(copyNimTree(child))
         else:
             quit "Unexpected node type (" & $child.kind & ")"
 

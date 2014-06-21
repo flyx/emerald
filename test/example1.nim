@@ -25,5 +25,12 @@ proc templ(youAreUsingNimHTML: bool): string =
                    HTML structure and relieves you from
                    the ugly mess that HTML code is.
                    """
+                p:
+                    var i = 10
+                    while i > 5:
+                        i
+                        i = i - 1
+                    for j in 1..10:
+                        j
 
 echo templ(true)
