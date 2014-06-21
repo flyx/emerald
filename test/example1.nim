@@ -15,14 +15,17 @@ proc templ(youAreUsingNimHTML: bool): string =
             h1: "NimHTML - Nimrod HTML5 templating engine"
             d.content:
                 if youAreUsingNimHTML:
-                    p: "You are amazing"
+                    p:
+                        "You are amazing"; br(); "Continue."
                 else:
                     p: "Get on it!"
-                p: """
+                p:
+                    """
                     NimHTML is a macro-based type-safe
                     templating engine which validates your
                     HTML structure and relieves you from
                     the ugly mess that HTML code is.
                     """
+                    br()
 
 echo templ(true)

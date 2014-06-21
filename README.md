@@ -84,16 +84,28 @@ This list of features grows as things get implemented.
 ### HTML tags
 
 Currently, only a small list of HTML tags are supported, most of them are used
-in the example above. More will be added. HTML tags currently can only be used
-in block notation as shown in the example. If a name of a HTML tag is a keyword
-in nimrod, you can escape the tag name with accents.
+in the example above. More will be added. There are two ways of specifying HTML
+tags:
+
+ * As block nodes: The HTML nodes start a block, which contains the content of
+   the node.
+
+   ```nimrod
+   head:
+       title: "Page title"
+   ```
+
+ * As function calls: The HTML nodes look like procedure calls. These calls must
+   not be used in expressions, but as standalone statements (this may change in
+   the future).
+
+   ```nimrod
+   p: "Some text"; br(); "Some more text"
+   ```
+
+   Note that the semicolons are mandatory. You can replace them with line breaks.
 
 Because the `div` tag is used so frequently, it has `d` as shorthand.
-
-**TODO:**
-
- * support non-block style for empty HTML tags (like `<br />`).
- * support using HTML tags along with strings
 
 ### String content
 
@@ -123,7 +135,12 @@ You can declare variables using `var` everywhere.
 You can add HTML attributes to HTML tags in braces right after the tag.
 The syntax is
 
-	tagName = expression
+```nimrod
+body:
+	div(id = "main-wrapper"):
+		div(id = "main"):
+			p: "Some content"
+```
 
 If the tag name is a Nimrod keyword
 like `type`, you can escape the name with accents.
@@ -131,7 +148,9 @@ like `type`, you can escape the name with accents.
 There is a shorthand notation for classes of an HTML tag: write the
 class names right behind the tag, separated with `.`, like this:
 
-    body.class1.class2:
+```nimrod
+body.class1.class2:
+```
 
 **TODO:**
 

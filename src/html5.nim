@@ -179,18 +179,24 @@ proc processNode(tags: TTable[string, TTagHandling], parent: PNimrodNode,
         quit "The following mandatory attributes are missing on tag \"" &
              name & "\": " & msg
 
-    target.add(newCall("add", newIdentNode("result"), newStrLitNode(">")))
+    if childIndex < parent.len:
+        target.add(newCall("add", newIdentNode("result"), newStrLitNode(">")))
+        var childMode: TOutputMode = unknown
+        processChilds(tags, name, parent[childIndex], depth, target, childMode)
 
-    var childMode: TOutputMode = unknown
-
-    processChilds(tags, name, parent[childIndex], depth, target, childMode)
-    if childMode == blockmode:
-        target.add(newCall("add", newIdentNode("result"),
-                           newStrLitNode(repeatChar(4 * depth, ' ') &
-                                         "</" & name & ">")))
+        if childMode == blockmode:
+            target.add(newCall("add", newIdentNode("result"),
+                               newStrLitNode(repeatChar(4 * depth, ' ') &
+                                             "</" & name & ">")))
+        else:
+            target.add(newCall("add", newIdentNode("result"),
+                               newStrLitNode("</" & name & ">")))
+    elif tagProps.instaClosable:
+        target.add(newCall("add", newIdentNode("result"), newStrLitNode(" />")))
     else:
-        target.add(newCall("add", newIdentNode("result"),
-                           newStrLitNode("</" & name & ">")))
+        target.add(newCall("add", newIdentNode("result"), newStrLitNode("></" & name & ">")))
+
+
     if mode == blockmode:
         target.add(newCall("add", newIdentNode("result"),
                            newStrLitNode("\n")))
@@ -209,6 +215,11 @@ macro html5*(params : openarray[stmt]): stmt {.immediate.} =
                     requiredChilds : initSet[string](),
                     optionalChilds : initSet[string](),
                     instaClosable  : false)
+    tags["br"]  = (requiredAttrs  : initSet[string](),
+                   optionalAttrs  : initSet[string](),
+                   requiredChilds : initSet[string](),
+                   optionalChilds : initSet[string](),
+                   instaClosable  : true)
     tags["div"] = (requiredAttrs  : initSet[string](),
                    optionalAttrs  : initSet[string](),
                    requiredChilds : initSet[string](),
