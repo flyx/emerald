@@ -26,6 +26,13 @@ proc processNode(tags: TTable[string, TTagHandling], parent: PNimrodNode,
                  depth: int, target : var PNimrodNode,
                  mode: TOutputMode) {.compileTime.}
 
+proc identName(node: PNimrodNode): string {.compileTime, inline.} =
+    ## Used to be able to parse accent-quoted HTML tags as well.
+    ## A prominent HTML tag is <div>, which is a keyword in Nimrod.
+    ## You can either escape it with ``, or simply use "d" as a substitute.
+    let name: string = if node.kind == nnkAccQuoted: $node[0] else: $node
+    return if name == "d": "div" else: name
+
 proc processChilds(tags: TTable[string, TTagHandling], node: string,
                    parent: PNimrodNode, depth: int, target : var PNimrodNode,
                    mode  : var TOutputMode) {.compileTime.} =
@@ -33,7 +40,7 @@ proc processChilds(tags: TTable[string, TTagHandling], node: string,
     ## supported structures, generate the code of the compiled template.
     for child in parent.children:
         case child.kind:
-        of nnkEmpty, nnkFormalParams:
+        of nnkEmpty, nnkFormalParams, nnkCommentStmt:
             continue
         of nnkCall:
             if mode == unknown:
@@ -124,15 +131,18 @@ proc processChilds(tags: TTable[string, TTagHandling], node: string,
             target.add(copyNimTree(child))
         of nnkVarSection:
             target.add(copyNimTree(child))
+        of nnkCommand:
+            assert child.len == 2
+            assert child[0].kind == nnkIdent
+            case identName(child[0]):
+            of "call":
+                target.add(copyNimTree(child[1]))
+        of nnkIncludeStmt:
+            for incl in child.children:
+                target.add(newCall("add", newIdentNode("result"),
+                                   copyNimTree(incl)))
         else:
             quit "Unexpected node type (" & $child.kind & ")"
-
-proc identName(node: PNimrodNode): string {.compileTime, inline.} =
-    ## Used to be able to parse accent-quoted HTML tags as well.
-    ## A prominent HTML tag is <div>, which is a keyword in Nimrod.
-    ## You can either escape it with ``, or simply use "d" as a substitute.
-    let name: string = if node.kind == nnkAccQuoted: $node[0] else: $node
-    return if name == "d": "div" else: name
 
 proc processNode(tags: TTable[string, TTagHandling], parent: PNimrodNode,
                  depth: int, target : var PNimrodNode, mode: TOutputMode) =
@@ -233,13 +243,11 @@ proc processNode(tags: TTable[string, TTagHandling], parent: PNimrodNode,
     else:
         target.add(newCall("add", newIdentNode("result"), newStrLitNode("></" & name & ">")))
 
-
     if mode == blockmode:
         target.add(newCall("add", newIdentNode("result"),
                            newStrLitNode("\n")))
 
-
-macro html5*(params : openarray[stmt]): stmt {.immediate.} =
+proc html_template_impl(doctype: bool, content: PNimrodNode): PNimrodNode {.compileTime.} =
     ## parse the child tree of this node as HTML template. The macro
     ## transforms the template into Nimrod code. Currently,
     ## it is assumed that a variable "result" exists, and the generated
@@ -317,6 +325,26 @@ macro html5*(params : openarray[stmt]): stmt {.immediate.} =
                     requiredChilds : initSet[string](),
                     optionalChilds : initSet[string](),
                     instaClosable  : false)
+    tags["table" ] = (requiredAttrs  : initSet[string](),
+                      optionalAttrs  : initSet[string](),
+                      requiredChilds : initSet[string](),
+                      optionalChilds : toSet[string](["thead", "tbody", "tr"]),
+                      instaClosable  : false)
+    tags["th" ] = (requiredAttrs  : initSet[string](),
+                      optionalAttrs  : initSet[string](),
+                      requiredChilds : initSet[string](),
+                      optionalChilds : initSet[string](),
+                      instaClosable  : false)
+    tags["thead" ] = (requiredAttrs  : initSet[string](),
+                      optionalAttrs  : initSet[string](),
+                      requiredChilds : initSet[string](),
+                      optionalChilds : toSet[string](["tr"]),
+                      instaClosable  : false)
+    tags["tr" ] = (requiredAttrs  : initSet[string](),
+                      optionalAttrs  : initSet[string](),
+                      requiredChilds : initSet[string](),
+                      optionalChilds : toSet[string](["th", "td"]),
+                      instaClosable  : false)
     tags["title" ] = (requiredAttrs  : initSet[string](),
                       optionalAttrs  : initSet[string](),
                       requiredChilds : initSet[string](),
@@ -324,15 +352,17 @@ macro html5*(params : openarray[stmt]): stmt {.immediate.} =
                       instaClosable  : false)
 
 
-    result = newNimNode(nnkStmtList, params[0])
-    result.add(newCall("add", newIdentNode("result"),
-                       newStrLitNode("<!DOCTYPE html>\n")))
+    result = newNimNode(nnkStmtList, content)
+    if doctype:
+        result.add(newCall("add", newIdentNode("result"),
+                           newStrLitNode("<!DOCTYPE html>\n")))
 
-    var dummyParent = newNimNode(nnkCall, params[0])
-    dummyParent.add(newIdentNode("html"))
-    var dummyChild = newNimNode(nnkDo, dummyParent)
-    for i in 0 .. (params.len - 1):
-        dummyChild.add(params[i])
-    dummyParent.add(dummyChild)
-    processNode(tags, dummyParent, 0, result, blockmode)
+    var mode = blockmode
+    processChilds(tags, "", content, -1, result, mode)
     echo "---\n" & treeRepr(result)
+
+macro html_template*(content: stmt): stmt {.immediate.} =
+    result = html_template_impl(true, content)
+
+macro html_template_macro*(content: stmt): stmt {.immediate.} =
+    result = html_template_impl(false, content)

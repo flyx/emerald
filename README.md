@@ -28,35 +28,36 @@ Here is an example template to demonstrate what already works:
 ```nimrod
 proc templ(youAreUsingNimHTML: bool): string =
     result = ""
-    html5:
-        head:
-            title: "pageTitle"
-            script (`type` = "text/javascript"): """
-                if (foo) {
-                    bar(1 + 5)
-                }
-                """
-        body:
-            h1: "NimHTML - Nimrod HTML5 templating engine"
-            d.content:
-                if youAreUsingNimHTML:
-                    p:
-                        "You are amazing"; br(); "Continue."
-                else:
-                    p: "Get on it!"
-                p: """
-                   NimHTML is a macro-based type-safe
-                   templating engine which validates your
-                   HTML structure and relieves you from
-                   the ugly mess that HTML code is.
-                   """
+    html_template:
+    	html(lang = "en"):
+	        head:
+	            title: "pageTitle"
+	            script (`type` = "text/javascript"): """
+	                if (foo) {
+	                    bar(1 + 5)
+	                }
+	                """
+	        body:
+	            h1: "NimHTML - Nimrod HTML5 templating engine"
+	            d.content:
+	                if youAreUsingNimHTML:
+	                    p:
+	                        "You are amazing"; br(); "Continue."
+	                else:
+	                    p: "Get on it!"
+	                p: """
+	                   NimHTML is a macro-based type-safe
+	                   templating engine which validates your
+	                   HTML structure and relieves you from
+	                   the ugly mess that HTML code is.
+	                   """
 ```
 
 This produces:
 
 ```html
 <!DOCTYPE html>
-<html>
+<html lang="en">
     <head>
         <title>pageTitle</title>
         <script type="text/javascript">
@@ -170,6 +171,52 @@ body.class1.class2:
 **TODO:**
 
  * Provide a shorthand notation for `id`
+
+### Calling Nimrod procs
+
+You can call any visible proc *that does not return a value* from anywhere by
+prefixing the call with `call`:
+
+```nimrod
+var i
+call inc(i)
+```
+
+If you want to include the return value of a proc in the output stream, use
+`include` instead:
+
+```nimrod
+include repeatChar(20, '*')
+```
+
+### Template macros
+
+You don't have to implement your template as a whole. Instead, you can
+implement small portions of it as `template macros`, which you can include
+in the main template. Example:
+
+```nimrod
+proc table(headings : seq[string]): string =
+    result = ""
+    html_template_macro:
+        table:
+            thead:
+                tr:
+                    for heading in headings:
+                        th: heading
+
+proc templ(): string =
+	result = ""
+	html_template:
+		html(lang = "en"):
+			head:
+				title: "Title"
+			body:
+				include table(["first", "middle", "last"])
+```
+
+NimHTML cannot validate whether the macro fits at the current position of
+your HTML hierarchy.
 
 ### License
 
