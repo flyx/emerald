@@ -152,8 +152,8 @@ The syntax is
 
 ```nimrod
 body:
-	div(id = "main-wrapper"):
-		div(id = "main"):
+	d(id = "main-wrapper"):
+		d(id = "main"):
 			p: "Some content"
 ```
 
