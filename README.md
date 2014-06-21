@@ -27,51 +27,54 @@ Here is an example template to demonstrate what already works:
 
 ```nimrod
 proc templ(youAreUsingNimHTML: bool): string =
-	result = ""
-	html5:
-	    head:
-	        title: "pageTitle"
-	        script (`type` = "text/javascript"): """
-	            if (foo) {
-	                bar(1 + 5)
-	            }
-	            """
-	    body:
-	        h1: "NimHTML - Nimrod HTML5 templating engine"
-	        d.content:
-	            if youAreUsingNimHTML:
-	                p: "You are amazing"
-	            else:
-	                p: "Get on it!"
-	            p: """
-	                NimHTML is a macro-based type-safe
-	                templating engine which validates your
-	                HTML structure and relieves you from
-	                the ugly mess that HTML code is.
-	                """
+    result = ""
+    html5:
+        head:
+            title: "pageTitle"
+            script (`type` = "text/javascript"): """
+                if (foo) {
+                    bar(1 + 5)
+                }
+                """
+        body:
+            h1: "NimHTML - Nimrod HTML5 templating engine"
+            d.content:
+                if youAreUsingNimHTML:
+                    p:
+                        "You are amazing"; br(); "Continue."
+                else:
+                    p: "Get on it!"
+                p: """
+                   NimHTML is a macro-based type-safe
+                   templating engine which validates your
+                   HTML structure and relieves you from
+                   the ugly mess that HTML code is.
+                   """
 ```
 
 This produces:
 
 ```html
-<!doctype html>
+<!DOCTYPE html>
 <html>
     <head>
         <title>pageTitle</title>
-        <script type="text/javascript">                if (foo) {
-                    bar(1 + 5)
-                }
-                </script>
+        <script type="text/javascript">
+            if (foo) {
+                bar(1 + 5)
+            }
+        </script>
     </head>
     <body>
         <h1>NimHTML - Nimrod HTML5 templating engine</h1>
         <div class="content">
-            <p>You are amazing</p>
-            <p>                    NimHTML is a macro-based type-safe
-                    templating engine which validates your
-                    HTML structure and relieves you from
-                    the ugly mess that HTML code is.
-                    </p>
+            <p>You are amazing<br />Continue.</p>
+            <p>
+                NimHTML is a macro-based type-safe
+                templating engine which validates your
+                HTML structure and relieves you from
+                the ugly mess that HTML code is.
+            </p>
         </div>
     </body>
 </html>
@@ -110,11 +113,12 @@ Because the `div` tag is used so frequently, it has `d` as shorthand.
 ### String content
 
 String content can be included as string literals. Long literals and infix
-operators work, too.
+operators work, too. NimHTML tries to preserve indentation within long string
+literals (for JavaScript and such). It strips leading and trailing whitespace per
+line and adds its own indentation instead so that the output looks nice.
 
 **TODO:**
 
- * Fix output of long strings (identation and such)
  * Add ability to call procs that return a string
 
 ### Control structures

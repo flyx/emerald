@@ -19,13 +19,11 @@ proc templ(youAreUsingNimHTML: bool): string =
                         "You are amazing"; br(); "Continue."
                 else:
                     p: "Get on it!"
-                p:
-                    """
-                    NimHTML is a macro-based type-safe
-                    templating engine which validates your
-                    HTML structure and relieves you from
-                    the ugly mess that HTML code is.
-                    """
-                    br()
+                p: """
+                   NimHTML is a macro-based type-safe
+                   templating engine which validates your
+                   HTML structure and relieves you from
+                   the ugly mess that HTML code is.
+                   """
 
 echo templ(true)

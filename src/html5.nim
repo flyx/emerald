@@ -44,11 +44,38 @@ proc processChilds(tags: TTable[string, TTagHandling], node: string,
                         if mode == blockMode: depth + 1 else: 0, target, mode)
         of nnkStmtList:
             processChilds(tags, node, child, depth, target, mode)
-        of nnkStrLit, nnkTripleStrLit, nnkInfix:
+        of nnkStrLit, nnkInfix:
             if mode == unknown:
                 mode = flowmode
             target.add(newCall("add", newIdentNode("result"),
                                copyNimTree(child)))
+        of nnkTripleStrLit:
+            if mode == unknown:
+                mode = blockmode
+                target.add(newCall("add", newIdentNode("result"),
+                                   newStrLitNode("\n")))
+            var first = true
+            var baseIndent = 0
+            for line in child.strVal.splitLines:
+                let frontStripped = line.strip(true, false)
+                if frontStripped.len == 0:
+                    continue
+                if first:
+                    baseIndent = line.len - frontStripped.len
+                    first = false
+                var firstContentChar = -1
+                for i in 0..(baseIndent - 1):
+                    if line[i] != ' ':
+                        firstContentChar = i
+                        break
+                if firstContentChar == -1:
+                    firstContentChar = baseIndent
+
+                target.add(newCall("add", newIdentNode("result"),
+                           newStrLitNode(repeatChar(4 * (depth + 1), ' ') &
+                                         line[firstContentChar..line.len - 1] &
+                                         "\n")))
+
         of nnkIfStmt:
             assert child[0].kind == nnkElifBranch
             assert child[0][1].kind == nnkStmtList
@@ -289,7 +316,7 @@ macro html5*(params : openarray[stmt]): stmt {.immediate.} =
 
     result = newNimNode(nnkStmtList, params[0])
     result.add(newCall("add", newIdentNode("result"),
-                       newStrLitNode("<!doctype html>\n")))
+                       newStrLitNode("<!DOCTYPE html>\n")))
 
     var dummyParent = newNimNode(nnkCall, params[0])
     dummyParent.add(newIdentNode("html"))
