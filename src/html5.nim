@@ -147,7 +147,6 @@ proc processChilds(tags: TTable[string, TTagHandling], node: string,
 proc processNode(tags: TTable[string, TTagHandling], parent: PNimrodNode,
                  depth: int, target : var PNimrodNode, mode: TOutputMode) =
     ## Process one node the represents an HTML tag in the source tree.
-    echo treeRepr(parent)
     let
         globalAttributes : TSet[string] = toSet([
                 "acceskey", "contenteditable", "contextmenu", "dir",
@@ -247,122 +246,49 @@ proc processNode(tags: TTable[string, TTagHandling], parent: PNimrodNode,
         target.add(newCall("add", newIdentNode("result"),
                            newStrLitNode("\n")))
 
-proc html_template_impl(doctype: bool, content: PNimrodNode): PNimrodNode {.compileTime.} =
+include impl.htmltags
+
+proc html_template_impl(content: PNimrodNode, doctype: bool): PNimrodNode {.compileTime.} =
     ## parse the child tree of this node as HTML template. The macro
     ## transforms the template into Nimrod code. Currently,
     ## it is assumed that a variable "result" exists, and the generated
     ## code will append its output to this variable.
+    echo treeRepr(content) & "\n---"
+    assert content.kind == nnkProcDef
 
-    var
-        tags : TTagList = initTable[string, TTagHandling]()
-    tags["body"] = (requiredAttrs  : initSet[string](),
-                    optionalAttrs  : initSet[string](),
-                    requiredChilds : initSet[string](),
-                    optionalChilds : initSet[string](),
-                    instaClosable  : false)
-    tags["br"]  = (requiredAttrs  : initSet[string](),
-                   optionalAttrs  : initSet[string](),
-                   requiredChilds : initSet[string](),
-                   optionalChilds : initSet[string](),
-                   instaClosable  : true)
-    tags["div"] = (requiredAttrs  : initSet[string](),
-                   optionalAttrs  : initSet[string](),
-                   requiredChilds : initSet[string](),
-                   optionalChilds : initSet[string](),
-                   instaClosable  : false)
-    tags["h1"] = (requiredAttrs  : initSet[string](),
-                  optionalAttrs  : initSet[string](),
-                  requiredChilds : initSet[string](),
-                  optionalChilds : initSet[string](),
-                  instaClosable  : false)
-    tags["h2"] = (requiredAttrs  : initSet[string](),
-                  optionalAttrs  : initSet[string](),
-                  requiredChilds : initSet[string](),
-                  optionalChilds : initSet[string](),
-                  instaClosable  : false)
-    tags["h3"] = (requiredAttrs  : initSet[string](),
-                  optionalAttrs  : initSet[string](),
-                  requiredChilds : initSet[string](),
-                  optionalChilds : initSet[string](),
-                  instaClosable  : false)
-    tags["h4"] = (requiredAttrs  : initSet[string](),
-                  optionalAttrs  : initSet[string](),
-                  requiredChilds : initSet[string](),
-                  optionalChilds : initSet[string](),
-                  instaClosable  : false)
-    tags["h5"] = (requiredAttrs  : initSet[string](),
-                  optionalAttrs  : initSet[string](),
-                  requiredChilds : initSet[string](),
-                  optionalChilds : initSet[string](),
-                  instaClosable  : false)
-    tags["h6"] = (requiredAttrs  : initSet[string](),
-                  optionalAttrs  : initSet[string](),
-                  requiredChilds : initSet[string](),
-                  optionalChilds : initSet[string](),
-                  instaClosable  : false)
-    tags["head"] = (requiredAttrs  : initSet[string](),
-                    optionalAttrs  : initSet[string](),
-                    requiredChilds : toSet[string](["title"]),
-                    optionalChilds : initSet[string](),
-                    instaClosable  : false)
-    tags["html"] = (requiredAttrs  : initSet[string](),
-                    optionalAttrs  : initSet[string](),
-                    requiredChilds : toSet[string](["head", "body"]),
-                    optionalChilds : initSet[string](),
-                    instaClosable  : false)
-    tags["p"] = (requiredAttrs  : initSet[string](),
-                 optionalAttrs  : initSet[string](),
-                 requiredChilds : initSet[string](),
-                 optionalChilds : initSet[string](),
-                 instaClosable  : false)
-    tags["script"] = (requiredAttrs : initSet[string](),
-                      optionalAttrs : toSet(["type"]),
-                      requiredChilds: initSet[string](),
-                      optionalChilds: initSet[string](),
-                      instaClosable : false)
-    tags["span"] = (requiredAttrs  : initSet[string](),
-                    optionalAttrs  : initSet[string](),
-                    requiredChilds : initSet[string](),
-                    optionalChilds : initSet[string](),
-                    instaClosable  : false)
-    tags["table" ] = (requiredAttrs  : initSet[string](),
-                      optionalAttrs  : initSet[string](),
-                      requiredChilds : initSet[string](),
-                      optionalChilds : toSet[string](["thead", "tbody", "tr"]),
-                      instaClosable  : false)
-    tags["th" ] = (requiredAttrs  : initSet[string](),
-                      optionalAttrs  : initSet[string](),
-                      requiredChilds : initSet[string](),
-                      optionalChilds : initSet[string](),
-                      instaClosable  : false)
-    tags["thead" ] = (requiredAttrs  : initSet[string](),
-                      optionalAttrs  : initSet[string](),
-                      requiredChilds : initSet[string](),
-                      optionalChilds : toSet[string](["tr"]),
-                      instaClosable  : false)
-    tags["tr" ] = (requiredAttrs  : initSet[string](),
-                      optionalAttrs  : initSet[string](),
-                      requiredChilds : initSet[string](),
-                      optionalChilds : toSet[string](["th", "td"]),
-                      instaClosable  : false)
-    tags["title" ] = (requiredAttrs  : initSet[string](),
-                      optionalAttrs  : initSet[string](),
-                      requiredChilds : initSet[string](),
-                      optionalChilds : initSet[string](),
-                      instaClosable  : false)
+    result = newNimNode(nnkProcDef, content)
 
-
-    result = newNimNode(nnkStmtList, content)
-    if doctype:
-        result.add(newCall("add", newIdentNode("result"),
-                           newStrLitNode("<!DOCTYPE html>\n")))
-
-    var mode = blockmode
-    processChilds(tags, "", content, -1, result, mode)
-    echo "---\n" & treeRepr(result)
+    for child in content.children:
+        case child.kind:
+        of nnkFormalParams:
+            when false:
+                var
+                    formalParams = copyNimTree(child)
+                    identDef = newNimNode(nnkIdentDefs, child)
+                identDef.add(newIdentNode("o"))
+                identDef.add(newIdentNode("PStream"))
+                formalParams.insert(0, identDef)
+                result.add(formalParams)
+            else:
+                result.add(copyNimTree(child))
+        of nnkStmtList:
+            var
+                stmts = newNimNode(nnkStmtList, child)
+                resultInit = newNimNode(nnkInfix, child)
+                mode = blockmode
+            stmts.add(newAssignment(newIdentNode("result"), newStrLitNode("")))
+            if doctype:
+                stmts.add(newCall("add", newIdentNode("result"),
+                                  newStrLitNode("<!DOCTYPE html>\n")))
+            processChilds(tags(), "", child, -1, stmts, mode)
+            result.add(stmts)
+        of nnkEmpty, nnkPragma, nnkIdent:
+            result.add(copyNimTree(child))
+        else:
+            quit "Unexpected node in template proc def: " & $child.kind
 
 macro html_template*(content: stmt): stmt {.immediate.} =
-    result = html_template_impl(true, content)
+    result = html_template_impl(content, true)
 
 macro html_template_macro*(content: stmt): stmt {.immediate.} =
-    result = html_template_impl(false, content)
+    result = html_template_impl(content, false)

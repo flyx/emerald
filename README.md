@@ -26,31 +26,29 @@ infrastructure.
 Here is an example template to demonstrate what already works:
 
 ```nimrod
-proc templ(youAreUsingNimHTML: bool): string =
-    result = ""
-    html_template:
-    	html(lang = "en"):
-	        head:
-	            title: "pageTitle"
-	            script (`type` = "text/javascript"): """
-	                if (foo) {
-	                    bar(1 + 5)
-	                }
-	                """
-	        body:
-	            h1: "NimHTML - Nimrod HTML5 templating engine"
-	            d.content:
-	                if youAreUsingNimHTML:
-	                    p:
-	                        "You are amazing"; br(); "Continue."
-	                else:
-	                    p: "Get on it!"
-	                p: """
-	                   NimHTML is a macro-based type-safe
-	                   templating engine which validates your
-	                   HTML structure and relieves you from
-	                   the ugly mess that HTML code is.
-	                   """
+proc templ(youAreUsingNimHTML: bool): string {.html_template.} =
+    html(lang = "en"):
+        head:
+            title: "pageTitle"
+            script (`type` = "text/javascript"): """
+                if (foo) {
+                    bar(1 + 5)
+                }
+                """
+        body:
+            h1: "NimHTML - Nimrod HTML5 templating engine"
+            d.content:
+                if youAreUsingNimHTML:
+                    p:
+                        "You are amazing"; br(); "Continue."
+                else:
+                    p: "Get on it!"
+                p: """
+                   NimHTML is a macro-based type-safe
+                   templating engine which validates your
+                   HTML structure and relieves you from
+                   the ugly mess that HTML code is.
+                   """
 ```
 
 This produces:
@@ -220,7 +218,7 @@ your HTML hierarchy.
 
 ### License
 
-[WTFPL][3].
+[WTFPL][3]
 
  [1]: http://jade-lang.com
  [2]: http://haml.info
