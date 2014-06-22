@@ -1,10 +1,10 @@
-include
-    ../src/html5
+include ../src/html5
+import streams
 
-proc mac(): string {.html_template_macro.} =
+proc mac() {.html_template_macro.} =
     "this is a macro"
 
-proc templ(): string {.html_template.} =
+proc templ() {.html_template.} =
     html(lang = "en"):
         head:
             title: "pageTitle"
@@ -20,6 +20,11 @@ proc templ(): string {.html_template.} =
                     call inc(j, -1)
             p.macroTest:
                 include mac()
+            p.putTest:
+                put repeatChar(10, '-')
+            p.discardTest:
+                discard 1 + 1
         when false:
             include foobar()
-echo templ()
+
+templ(newFileStream(stdout))

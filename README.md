@@ -26,7 +26,7 @@ infrastructure.
 Here is an example template to demonstrate what already works:
 
 ```nimrod
-proc templ(youAreUsingNimHTML: bool): string {.html_template.} =
+proc templ(youAreUsingNimHTML: bool) {.html_template.} =
     html(lang = "en"):
         head:
             title: "pageTitle"
@@ -79,6 +79,25 @@ This produces:
 </html>
 ```
 
+## Usage
+
+NimHTML templates are written as procedures. Just write a procedure
+declaration, add any parameters you need, and then add the pragma
+`html_template`. This will parse the contents of the procedure
+implementation as HTML template. To be able to use the template macros,
+you must **include** (not import) the module `html5`.
+
+To use the template, just call it by the name you gave it, **pass
+a `PStream` as first argument**, and give values for the parameters
+*you* declared afterwards. The `PStream` parameter is injected automatically,
+so you need to import the package `streams` from the standard library.
+
+**TODO:**
+
+The `PStream` variable is currently named `o`. Forbid the user to use
+that name on own variables, and, change the name to something the user
+will most certainly not come up with.
+
 ## Features
 
 This list of features grows as things get implemented.
@@ -115,10 +134,6 @@ String content can be included as string literals. Long literals and infix
 operators work, too. NimHTML tries to preserve indentation within long string
 literals (for JavaScript and such). It strips leading and trailing whitespace per
 line and adds its own indentation instead so that the output looks nice.
-
-**TODO:**
-
- * Add ability to call procs that return a string
 
 ### Control structures
 
@@ -172,19 +187,26 @@ body.class1.class2:
 
 ### Calling Nimrod procs
 
-You can call any visible proc *that does not return a value* from anywhere by
-prefixing the call with `call`:
+You can call any visible proc that does not return a value from anywhere by
+prefixing the call with `call`, and one that does return a value with
+`discard`. If you want to use the returned value, you can also assign it
+to a variable.
 
 ```nimrod
 var i
 call inc(i)
 ```
 
-If you want to include the return value of a proc in the output stream, use
-`include` instead:
+If you want to output the return value of a proc, use `put` instead:
 
 ```nimrod
-include repeatChar(20, '*')
+put repeatChar(20, '*')
+```
+
+If you want to include a template macro (see below), use `include`:
+
+```nimrod
+include myMacro()
 ```
 
 ### Template macros
@@ -194,14 +216,14 @@ implement small portions of it as `template macros`, which you can include
 in the main template. Example:
 
 ```nimrod
-proc table(headings : seq[string]): string {.html_template_macro.} =
+proc table(headings : seq[string]) {.html_template_macro.} =
     table:
         thead:
             tr:
                 for heading in headings:
                     th: heading
 
-proc templ(): string {.html_template.} =
+proc templ() {.html_template.} =
 	html(lang = "en"):
 		head:
 			title: "Title"

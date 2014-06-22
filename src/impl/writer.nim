@@ -16,7 +16,7 @@ proc newStmtListWriter*(lineRef: PNimrodNode = nil): PStmtListWriter {.compileTi
 
 proc consumeCache(writer : PStmtListWriter) {.compileTime.} =
     if writer.literalStringCache.len > 0:
-        writer.output.add(newCall(newIdentNode("add"), newIdentNode("result"),
+        writer.output.add(newCall(newIdentNode("write"), newIdentNode("o"),
                           newStrLitNode(writer.literalStringCache)))
         writer.literalStringCache = ""
 
@@ -41,5 +41,5 @@ proc addStringExpr*(writer: PStmtListWriter, val: PNimrodNode) {.compileTime.} =
         writer.addString(val.strVal)
     else:
         writer.consumeCache()
-        writer.output.add(newCall(newIdentNode("add"), newIdentNode("result"),
+        writer.output.add(newCall(newIdentNode("write"), newIdentNode("o"),
                           copyNimTree(val)))

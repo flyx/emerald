@@ -1,7 +1,8 @@
-include
-    ../src/html5
+include ../src/html5
 
-proc templ(youAreUsingNimHTML: bool): string {.html_template.} =
+import streams
+
+proc templ(youAreUsingNimHTML: bool) {.html_template.} =
     html(lang = "en"):
         head:
             title: "pageTitle"
@@ -25,4 +26,4 @@ proc templ(youAreUsingNimHTML: bool): string {.html_template.} =
                    the ugly mess that HTML code is.
                    """
 
-echo templ(true)
+templ(newFileStream(stdout), true)

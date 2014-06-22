@@ -103,9 +103,7 @@ proc processChilds(writer: var PStmtListWriter, htmlTag: string,
             writer.addNode(ifNode)
         of nnkForStmt, nnkWhileStmt:
             writer.addNode(copyNodeParseChildren(htmlTag, child, depth, mode))
-        of nnkAsgn:
-            writer.addNode(copyNimTree(child))
-        of nnkVarSection:
+        of nnkAsgn, nnkVarSection, nnkDiscardStmt:
             writer.addNode(copyNimTree(child))
         of nnkCommand:
             assert child.len == 2
@@ -113,9 +111,13 @@ proc processChilds(writer: var PStmtListWriter, htmlTag: string,
             case identName(child[0]):
             of "call":
                 writer.addNode(copyNimTree(child[1]))
+            of "put":
+                writer.addStringExpr(copyNimTree(child[1]))
         of nnkIncludeStmt:
-            for incl in child.children:
-                writer.addStringExpr(copyNimTree(incl))
+            assert child[0].kind == nnkCall
+            var call = copyNimTree(child[0])
+            call.insert(1, newIdentNode("o"))
+            writer.addNode(call)
         else:
             quit "Unexpected node type (" & $child.kind & ")"
 
@@ -233,26 +235,27 @@ proc html_template_impl(content: PNimrodNode, doctype: bool): PNimrodNode =
     ## code will append its output to this variable.
     assert content.kind == nnkProcDef
 
+    echo treeRepr(content)
     result = newNimNode(nnkProcDef, content)
 
     for child in content.children:
         case child.kind:
         of nnkFormalParams:
-            when false:
-                var
-                    formalParams = copyNimTree(child)
-                    identDef = newNimNode(nnkIdentDefs, child)
-                identDef.add(newIdentNode("o"))
-                identDef.add(newIdentNode("PStream"))
-                formalParams.insert(0, identDef)
-                result.add(formalParams)
-            else:
-                result.add(copyNimTree(child))
+            var
+                formalParams = copyNimTree(child)
+                identDef = newNimNode(nnkIdentDefs, child)
+                insertPos = 0
+            while insertPos < formalParams.len and formalParams[insertPos].kind == nnkEmpty:
+                inc(insertPos)
+            identDef.add(newIdentNode("o"))
+            identDef.add(newIdentNode("PStream"))
+            identDef.add(newNimNode(nnkEmpty))
+            formalParams.insert(insertPos, identDef)
+            result.add(formalParams)
         of nnkStmtList:
             var
                 mode = blockmode
                 writer = newStmtListWriter()
-            writer.addNode(newAssignment(newIdentNode("result"), newStrLitNode("")))
             if doctype:
                 writer.addString("<!DOCTYPE html>\n")
             processChilds(writer, "", child, -1, mode)
@@ -261,4 +264,3 @@ proc html_template_impl(content: PNimrodNode, doctype: bool): PNimrodNode =
             result.add(copyNimTree(child))
         else:
             quit "Unexpected node in template proc def: " & $child.kind
-    echo treeRepr(result)
