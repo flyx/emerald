@@ -128,6 +128,12 @@ tags:
 
 Because the `div` tag is used so frequently, it has `d` as shorthand.
 
+**TODO:**
+
+Most HTML elements are currently not supported because they all need to be
+properly declared in the code (with all rules that should apply to them). I
+will do this once the base system is in a usable state.
+
 ### String content
 
 String content can be included as string literals. Long literals and infix
@@ -234,7 +240,15 @@ proc templ() {.html_template.} =
 NimHTML cannot validate whether the macro fits at the current position of
 your HTML hierarchy.
 
-### License
+### Error Handling
+
+**TODO:**
+
+The code currently uses some `quit` statements and some `assert`s to deal with
+errors. It should always report the proper file and line of the input where the
+error occurred.
+
+## License
 
 [WTFPL][3]
 
