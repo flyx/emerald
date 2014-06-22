@@ -1,3 +1,14 @@
+import
+    sets, tables
+
+type
+    TTagHandling* = tuple[requiredAttrs  : TSet[string],
+                          optionalAttrs  : TSet[string],
+                          requiredChilds : TSet[string],
+                          optionalChilds : TSet[string],
+                          instaClosable  : bool]
+
+    TTagList* = TTable[string, TTagHandling]
 
 proc tags*(): TTagList {.compileTime.} =
     result = initTable[string, TTagHandling]()

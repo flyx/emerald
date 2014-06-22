@@ -194,23 +194,19 @@ implement small portions of it as `template macros`, which you can include
 in the main template. Example:
 
 ```nimrod
-proc table(headings : seq[string]): string =
-    result = ""
-    html_template_macro:
-        table:
-            thead:
-                tr:
-                    for heading in headings:
-                        th: heading
+proc table(headings : seq[string]): string {.html_template_macro.} =
+    table:
+        thead:
+            tr:
+                for heading in headings:
+                    th: heading
 
-proc templ(): string =
-	result = ""
-	html_template:
-		html(lang = "en"):
-			head:
-				title: "Title"
-			body:
-				include table(["first", "middle", "last"])
+proc templ(): string {.html_template.} =
+	html(lang = "en"):
+		head:
+			title: "Title"
+		body:
+			include table(["first", "middle", "last"])
 ```
 
 NimHTML cannot validate whether the macro fits at the current position of

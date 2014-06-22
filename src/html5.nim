@@ -1,30 +1,19 @@
 import
-    macros, sets, tables, strutils
+    macros, tables, strutils, impl.writer, sets
 
 type
-    TTagHandling = tuple[requiredAttrs  : TSet[string],
-                         optionalAttrs  : TSet[string],
-                         requiredChilds : TSet[string],
-                         optionalChilds : TSet[string],
-                         instaClosable  : bool]
-
-    TTagList = TTable[string, TTagHandling]
-
     TOutputMode = enum
         unknown, blockmode, flowmode
 
-proc processAttribute(tags: TTable[string, TTagHandling],
-                      name: string, value: PNimrodNode,
-                      target : var PNimrodNode) {.compileTime.} =
+proc processAttribute(writer: var PStmtListWriter,
+                      name  : string, value: PNimrodNode) {.compileTime.} =
     ## generate code that adds an HTML tag attribute to the output
-    target.add(newCall("add", newIdentNode("result"),
-                       newStrLitNode(" " & name & "=\"")))
-    target.add(newCall("add", newIdentNode("result"), copyNimTree(value)))
-    target.add(newCall("add", newIdentNode("result"), newStrLitNode("\"")))
+    writer.addString(" " & name & "=\"")
+    writer.addStringExpr(copyNimTree(value))
+    writer.addString("\"")
 
-proc processNode(tags: TTable[string, TTagHandling], parent: PNimrodNode,
-                 depth: int, target : var PNimrodNode,
-                 mode: TOutputMode) {.compileTime.}
+proc processNode(writer: var PStmtListWriter, parent: PNimrodNode,
+                 depth : int, mode: TOutputMode) {.compileTime.}
 
 proc identName(node: PNimrodNode): string {.compileTime, inline.} =
     ## Used to be able to parse accent-quoted HTML tags as well.
@@ -33,8 +22,12 @@ proc identName(node: PNimrodNode): string {.compileTime, inline.} =
     let name: string = if node.kind == nnkAccQuoted: $node[0] else: $node
     return if name == "d": "div" else: name
 
-proc processChilds(tags: TTable[string, TTagHandling], node: string,
-                   parent: PNimrodNode, depth: int, target : var PNimrodNode,
+proc copyNodeParseChildren(htmlTag: string,
+                           node: PNimrodNode, depth: int,
+                           mode: var TOutputMode): PNimrodNode {.compileTime.}
+
+proc processChilds(writer: var PStmtListWriter, htmlTag: string,
+                   parent: PNimrodNode, depth: int,
                    mode  : var TOutputMode) {.compileTime.} =
     ## Called on a nnkStmtList. Process all child nodes of the lists, parse
     ## supported structures, generate the code of the compiled template.
@@ -45,29 +38,26 @@ proc processChilds(tags: TTable[string, TTagHandling], node: string,
         of nnkCall:
             if mode == unknown:
                 mode = blockmode
-                target.add(newCall("add", newIdentNode("result"),
-                                   newStrLitNode("\n")))
-            processNode(tags, child,
-                        if mode == blockMode: depth + 1 else: 0, target, mode)
+                writer.addString("\n")
+            processNode(writer, child,
+                        if mode == blockMode: depth + 1 else: 0, mode)
         of nnkStmtList:
-            processChilds(tags, node, child, depth, target, mode)
+            processChilds(writer, htmlTag, child, depth, mode)
         of nnkStrLit, nnkInfix:
             if mode == unknown:
                 mode = flowmode
-            target.add(newCall("add", newIdentNode("result"),
-                               copyNimTree(child)))
+            writer.addStringExpr(copyNimTree(child))
         of nnkIdent:
             if mode == unknown:
                 mode = flowmode
             var printVar = newNimNode(nnkPrefix, child)
             printVar.add(newIdentNode("$"))
             printVar.add(copyNimTree(child))
-            target.add(newCall("add", newIdentNode("result"), printVar))
+            writer.addStringExpr(printVar)
         of nnkTripleStrLit:
             if mode == unknown:
                 mode = blockmode
-                target.add(newCall("add", newIdentNode("result"),
-                                   newStrLitNode("\n")))
+                writer.addString("\n")
             var first = true
             var baseIndent = 0
             for line in child.strVal.splitLines:
@@ -84,68 +74,49 @@ proc processChilds(tags: TTable[string, TTagHandling], node: string,
                         break
                 if firstContentChar == -1:
                     firstContentChar = baseIndent
-
-                target.add(newCall("add", newIdentNode("result"),
-                           newStrLitNode(repeatChar(4 * (depth + 1), ' ') &
-                                         line[firstContentChar..line.len - 1] &
-                                         "\n")))
+                writer.addString(repeatChar(4 * (depth + 1), ' ') &
+                                 line[firstContentChar..line.len - 1] & "\n")
 
         of nnkIfStmt:
-            assert child[0].kind == nnkElifBranch
-            assert child[0][1].kind == nnkStmtList
-
             var 
                 ifNode = newNimNode(nnkIfStmt, child)
 
             for ifBranch in child.children:
-                case ifBranch.kind:
-                of nnkElifBranch:
-                    var
-                        ifCond = newNimNode(nnkElifBranch, ifBranch)
-                        ifContent = newNimNode(nnkStmtList, ifBranch[1])
-                    ifCond.add(copyNimTree(ifBranch[0]))
-                    processChilds(tags, node, ifBranch[1], depth, ifContent,
-                                  mode)
-                    ifCond.add(ifContent)
-                    ifNode.add(ifCond)
-                of nnkElse:
-                    var
-                        elseCond    = newNimNode(nnkElse, ifBranch)
-                        elseContent = newNimNode(nnkStmtList, ifBranch)
-                    processChilds(tags, node, ifBranch[0], depth, elseContent,
-                                  mode)
-                    elseCond.add(elseContent)
-                    ifNode.add(elseCond)
-                else:
-                    quit "The nimrod parser should not allow this…"
-            target.add(ifNode)
+                ifNode.add(copyNodeParseChildren(htmlTag, ifBranch, depth, mode))
+            writer.addNode(ifNode)
         of nnkForStmt, nnkWhileStmt:
-            let stmtIndex = if child.kind == nnkForStmt: 2 else: 1
-            var
-                newNode = copyNimTree(child)
-                newContent = newNimNode(nnkStmtList, child)
-            processChilds(tags, node, child[stmtIndex], depth, newContent, mode)
-            newNode[stmtIndex] = newContent
-            target.add(newNode)
+            writer.addNode(copyNodeParseChildren(htmlTag, child, depth, mode))
         of nnkAsgn:
-            target.add(copyNimTree(child))
+            writer.addNode(copyNimTree(child))
         of nnkVarSection:
-            target.add(copyNimTree(child))
+            writer.addNode(copyNimTree(child))
         of nnkCommand:
             assert child.len == 2
             assert child[0].kind == nnkIdent
             case identName(child[0]):
             of "call":
-                target.add(copyNimTree(child[1]))
+                writer.addNode(copyNimTree(child[1]))
         of nnkIncludeStmt:
             for incl in child.children:
-                target.add(newCall("add", newIdentNode("result"),
-                                   copyNimTree(incl)))
+                writer.addStringExpr(copyNimTree(incl))
         else:
             quit "Unexpected node type (" & $child.kind & ")"
 
-proc processNode(tags: TTable[string, TTagHandling], parent: PNimrodNode,
-                 depth: int, target : var PNimrodNode, mode: TOutputMode) =
+proc copyNodeParseChildren(htmlTag: string,
+                           node: PNimrodNode, depth: int,
+                           mode: var TOutputMode): PNimrodNode =
+    var
+        childWriter = newStmtListWriter()
+    result = copyNimNode(node)
+    for child in node.children:
+        if child.kind == nnkStmtList:
+            processChilds(childWriter, htmlTag, child, depth, mode)
+        else:
+            result.add(copyNimTree(child))
+    result.add(childWriter.result)
+
+proc processNode(writer: var PStmtListWriter, parent: PNimrodNode,
+                 depth: int, mode: TOutputMode) =
     ## Process one node the represents an HTML tag in the source tree.
     let
         globalAttributes : TSet[string] = toSet([
@@ -175,18 +146,15 @@ proc processNode(tags: TTable[string, TTagHandling], parent: PNimrodNode,
     else:
         quit "Unexpected node type (" & $parent[0].kind & ")"
 
-    if not tags.hasKey(name):
+    if not writer.tags.hasKey(name):
         quit "Unknown HTML tag: " & name
 
-    let tagProps = tags[name]
+    let tagProps = writer.tags[name]
 
     if mode == blockmode:
-        target.add(newCall("add", newIdentNode("result"),
-                           newStrLitNode(repeatChar(4 * depth, ' ') &
-                           "<" & name)))
+        writer.addString(repeatChar(4 * depth, ' ') & "<" & name)
     else:
-        target.add(newCall("add", newIdentNode("result"),
-                           newStrLitNode("<" & name)))
+        writer.addString("<" & name)
 
     if classes.len > 0:
         var
@@ -198,8 +166,7 @@ proc processNode(tags: TTable[string, TTagHandling], parent: PNimrodNode,
             else:
                 classString.add(" ")
             classString.add(class)
-        target.add(newCall("add", newIdentNode("result"),
-                           newStrLitNode(" class=\"" & classString & "\"")))
+        writer.addString(" class=\"" & classString & "\"")
 
     while childIndex < parent.len and parent[childIndex].kind == nnkExprEqExpr:
         let childName = identName(parent[childIndex][0])
@@ -211,7 +178,7 @@ proc processNode(tags: TTable[string, TTagHandling], parent: PNimrodNode,
         if childName in parsedAttributes:
             quit "Duplicate attribute: " & childName
         parsedAttributes.incl(childName)
-        processAttribute(tags, childName, parent[childIndex][1], target)
+        processAttribute(writer, childName, parent[childIndex][1])
         inc(childIndex)
 
     if not (tagProps.requiredAttrs <= parsedAttributes):
@@ -226,27 +193,21 @@ proc processNode(tags: TTable[string, TTagHandling], parent: PNimrodNode,
              name & "\": " & msg
 
     if childIndex < parent.len:
-        target.add(newCall("add", newIdentNode("result"), newStrLitNode(">")))
+        writer.addString(">")
         var childMode: TOutputMode = unknown
-        processChilds(tags, name, parent[childIndex], depth, target, childMode)
+        processChilds(writer, name, parent[childIndex], depth, childMode)
 
         if childMode == blockmode:
-            target.add(newCall("add", newIdentNode("result"),
-                               newStrLitNode(repeatChar(4 * depth, ' ') &
-                                             "</" & name & ">")))
+            writer.addString(repeatChar(4 * depth, ' ') & "</" & name & ">")
         else:
-            target.add(newCall("add", newIdentNode("result"),
-                               newStrLitNode("</" & name & ">")))
+            writer.addString("</" & name & ">")
     elif tagProps.instaClosable:
-        target.add(newCall("add", newIdentNode("result"), newStrLitNode(" />")))
+        writer.addString(" />")
     else:
-        target.add(newCall("add", newIdentNode("result"), newStrLitNode("></" & name & ">")))
+        writer.addString("></" & name & ">")
 
     if mode == blockmode:
-        target.add(newCall("add", newIdentNode("result"),
-                           newStrLitNode("\n")))
-
-include impl.htmltags
+        writer.addString("\n")
 
 proc html_template_impl(content: PNimrodNode, doctype: bool): PNimrodNode {.compileTime.} =
     ## parse the child tree of this node as HTML template. The macro
@@ -259,6 +220,7 @@ proc html_template_impl(content: PNimrodNode, doctype: bool): PNimrodNode {.comp
     result = newNimNode(nnkProcDef, content)
 
     for child in content.children:
+        echo child.kind
         case child.kind:
         of nnkFormalParams:
             when false:
@@ -273,15 +235,13 @@ proc html_template_impl(content: PNimrodNode, doctype: bool): PNimrodNode {.comp
                 result.add(copyNimTree(child))
         of nnkStmtList:
             var
-                stmts = newNimNode(nnkStmtList, child)
-                resultInit = newNimNode(nnkInfix, child)
                 mode = blockmode
-            stmts.add(newAssignment(newIdentNode("result"), newStrLitNode("")))
+                writer = newStmtListWriter()
+            writer.addNode(newAssignment(newIdentNode("result"), newStrLitNode("")))
             if doctype:
-                stmts.add(newCall("add", newIdentNode("result"),
-                                  newStrLitNode("<!DOCTYPE html>\n")))
-            processChilds(tags(), "", child, -1, stmts, mode)
-            result.add(stmts)
+                writer.addString("<!DOCTYPE html>\n")
+            processChilds(writer, "", child, -1, mode)
+            result.add(writer.result)
         of nnkEmpty, nnkPragma, nnkIdent:
             result.add(copyNimTree(child))
         else:
