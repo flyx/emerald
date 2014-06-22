@@ -37,6 +37,9 @@ proc addNode*(writer : PStmtListWriter, val: PNimrodNode) {.compileTime.} =
     writer.output.add(val)
 
 proc addStringExpr*(writer: PStmtListWriter, val: PNimrodNode) {.compileTime.} =
-    writer.consumeCache()
-    writer.output.add(newCall(newIdentNode("add"), newIdentNode("result"),
-                      copyNimTree(val)))
+    if val.kind == nnkStrLit:
+        writer.addString(val.strVal)
+    else:
+        writer.consumeCache()
+        writer.output.add(newCall(newIdentNode("add"), newIdentNode("result"),
+                          copyNimTree(val)))

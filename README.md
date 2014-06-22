@@ -122,7 +122,7 @@ line and adds its own indentation instead so that the output looks nice.
 
 ### Control structures
 
-`if`, `elif`, `else`, `for` and `while` work exactly as in Nimrod.
+`if`, `elif`, `else`, `when`, `for` and `while` work exactly as in Nimrod.
 
 **TODO:**
 

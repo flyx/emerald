@@ -1,6 +1,23 @@
 import
     macros, tables, strutils, impl.writer, sets
 
+# interface
+
+proc html_template_impl(content: PNimrodNode, doctype: bool): PNimrodNode {.compileTime.}
+
+macro html_template*(content: stmt): stmt {.immediate.} =
+    ## Use it as pragma on a proc. Parses the content of the proc as HTML
+    ## template and replaces its contents with the result
+    result = html_template_impl(content, true)
+
+macro html_template_macro*(content: stmt): stmt {.immediate.} =
+    ## Same as html_template, but does't write the doctype declaration in
+    ## front. Can be called from within other html templates and
+    ## template macros.
+    result = html_template_impl(content, false)
+
+# implementation
+
 type
     TOutputMode = enum
         unknown, blockmode, flowmode
@@ -43,7 +60,7 @@ proc processChilds(writer: var PStmtListWriter, htmlTag: string,
                         if mode == blockMode: depth + 1 else: 0, mode)
         of nnkStmtList:
             processChilds(writer, htmlTag, child, depth, mode)
-        of nnkStrLit, nnkInfix:
+        of nnkInfix, nnkStrLit:
             if mode == unknown:
                 mode = flowmode
             writer.addStringExpr(copyNimTree(child))
@@ -77,9 +94,9 @@ proc processChilds(writer: var PStmtListWriter, htmlTag: string,
                 writer.addString(repeatChar(4 * (depth + 1), ' ') &
                                  line[firstContentChar..line.len - 1] & "\n")
 
-        of nnkIfStmt:
+        of nnkIfStmt, nnkWhenStmt:
             var 
-                ifNode = newNimNode(nnkIfStmt, child)
+                ifNode = newNimNode(child.kind, child)
 
             for ifBranch in child.children:
                 ifNode.add(copyNodeParseChildren(htmlTag, ifBranch, depth, mode))
@@ -209,18 +226,16 @@ proc processNode(writer: var PStmtListWriter, parent: PNimrodNode,
     if mode == blockmode:
         writer.addString("\n")
 
-proc html_template_impl(content: PNimrodNode, doctype: bool): PNimrodNode {.compileTime.} =
+proc html_template_impl(content: PNimrodNode, doctype: bool): PNimrodNode =
     ## parse the child tree of this node as HTML template. The macro
     ## transforms the template into Nimrod code. Currently,
     ## it is assumed that a variable "result" exists, and the generated
     ## code will append its output to this variable.
-    echo treeRepr(content) & "\n---"
     assert content.kind == nnkProcDef
 
     result = newNimNode(nnkProcDef, content)
 
     for child in content.children:
-        echo child.kind
         case child.kind:
         of nnkFormalParams:
             when false:
@@ -246,9 +261,4 @@ proc html_template_impl(content: PNimrodNode, doctype: bool): PNimrodNode {.comp
             result.add(copyNimTree(child))
         else:
             quit "Unexpected node in template proc def: " & $child.kind
-
-macro html_template*(content: stmt): stmt {.immediate.} =
-    result = html_template_impl(content, true)
-
-macro html_template_macro*(content: stmt): stmt {.immediate.} =
-    result = html_template_impl(content, false)
+    echo treeRepr(result)

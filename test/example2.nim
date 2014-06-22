@@ -15,9 +15,11 @@ proc templ(): string {.html_template.} =
                     " "
             d.whileTest:
                 var j = 20
-                while j < 10:
+                while j > 10:
                     j
                     call inc(j, -1)
             p.macroTest:
                 include mac()
+        when false:
+            include foobar()
 echo templ()
