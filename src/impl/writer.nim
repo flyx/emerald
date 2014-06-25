@@ -1,4 +1,4 @@
-import macros, ../../src/tagdef
+import macros, "../tagdef", "../html5"
 
 type
     TStmtListWriter = tuple
@@ -36,10 +36,18 @@ proc addNode*(writer : PStmtListWriter, val: PNimrodNode) {.compileTime.} =
     writer.consumeCache()
     writer.output.add(val)
 
-proc addStringExpr*(writer: PStmtListWriter, val: PNimrodNode) {.compileTime.} =
+proc addEscapedStringExpr*(writer: PStmtListWriter, val: PNimrodNode,
+                           escapeQuotes: bool = false) {.compileTime.} =
     if val.kind == nnkStrLit:
-        writer.addString(val.strVal)
+        writer.addString(escapeHtml(val.strVal, escapeQuotes))
     else:
         writer.consumeCache()
+        var escapeCall: PNimrodNode
+        if escapeQuotes:
+            escapeCall = newCall(newIdentNode("escapeHtml"), copyNimTree(val),
+                                 newIdentNode("true"))
+        else:
+            escapeCall = newCall(newIdentNode("escapeHtml"), copyNimTree(val))
+
         writer.output.add(newCall(newIdentNode("write"), newIdentNode("o"),
-                          copyNimTree(val)))
+                          escapeCall))

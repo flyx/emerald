@@ -1,5 +1,21 @@
 import tagdef, tables, sets
 
+proc escapeHtml*(value : string, escapeQuotes: bool = false): string =
+    result = newStringOfCap(if value.len < 32: 64 else: value.len * 2)
+    for c in value:
+        case c:
+        of '&': result.add("&amp;")
+        of '<': result.add("&lt;")
+        of '>': result.add("&gt;")
+        of '"':
+            if escapeQuotes: result.add("&quot;")
+            else: result.add('"')
+        of '\'':
+            if escapeQuotes: result.add("&#39;")
+            else: result.add('\'')
+        else:
+            result.add(c)
+
 proc html5tags*(): TTagList {.compileTime, tagdef.} =
     a:
         content_categories = (flow_content, phrasing_content, interactive_content)

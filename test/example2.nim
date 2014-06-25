@@ -24,6 +24,8 @@ proc templ() {.html_template.} =
                 put repeatChar(10, '-')
             p.discardTest:
                 discard 1 + 1
+            p.escapeTest(id = "\"escape\">-<\'test\' &&&"):
+                "Let's <see> whether \"NimHTML\" escapes & stuff *properly*."
         when false:
             include foobar()
 

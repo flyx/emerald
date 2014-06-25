@@ -144,9 +144,9 @@ operators work, too. NimHTML tries to preserve indentation within long string
 literals (for JavaScript and such). It strips leading and trailing whitespace per
 line and adds its own indentation instead so that the output looks nice.
 
-**TODO:**
-
-Escape HTML characters within string content.
+The characters `<`, `>` and `&` are converted to their corresponding HTML
+entity automatically. It Attribute values, the characters `'` and `"` are
+also converted.
 
 ### Control structures
 

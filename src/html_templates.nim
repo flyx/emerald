@@ -26,7 +26,7 @@ proc processAttribute(writer: var PStmtListWriter,
                       name  : string, value: PNimrodNode) {.compileTime.} =
     ## generate code that adds an HTML tag attribute to the output
     writer.addString(" " & name & "=\"")
-    writer.addStringExpr(copyNimTree(value))
+    writer.addEscapedStringExpr(copyNimTree(value), true)
     writer.addString("\"")
 
 proc processNode(writer: var PStmtListWriter, parent: PNimrodNode,
@@ -63,14 +63,14 @@ proc processChilds(writer: var PStmtListWriter, htmlTag: string,
         of nnkInfix, nnkStrLit:
             if mode == unknown:
                 mode = flowmode
-            writer.addStringExpr(copyNimTree(child))
+            writer.addEscapedStringExpr(child)
         of nnkIdent:
             if mode == unknown:
                 mode = flowmode
             var printVar = newNimNode(nnkPrefix, child)
             printVar.add(newIdentNode("$"))
             printVar.add(copyNimTree(child))
-            writer.addStringExpr(printVar)
+            writer.addEscapedStringExpr(printVar)
         of nnkTripleStrLit:
             if mode == unknown:
                 mode = blockmode
@@ -112,7 +112,7 @@ proc processChilds(writer: var PStmtListWriter, htmlTag: string,
             of "call":
                 writer.addNode(copyNimTree(child[1]))
             of "put":
-                writer.addStringExpr(copyNimTree(child[1]))
+                writer.addEscapedStringExpr(copyNimTree(child[1]))
         of nnkIncludeStmt:
             assert child[0].kind == nnkCall
             var call = copyNimTree(child[0])

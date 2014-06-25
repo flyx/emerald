@@ -267,4 +267,3 @@ macro tagdef*(content: stmt): stmt {.immediate.} =
             par.add(buildSet("optionalAttrs", optionalAttrs))
             assignment.add(par)
             bodyStmts.add(assignment)
-    echo treeRepr(result)
