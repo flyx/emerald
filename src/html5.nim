@@ -1,6 +1,6 @@
-import ../../src/tagdef, tables, sets
+import tagdef, tables, sets
 
-proc htmltags*(): TTagList {.compileTime, tagdef.} =
+proc html5tags*(): TTagList {.compileTime, tagdef.} =
     a:
         content_categories = (flow_content, phrasing_content, interactive_content)
         permitted_content  = transparent

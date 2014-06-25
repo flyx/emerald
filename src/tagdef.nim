@@ -27,6 +27,8 @@ proc identName(node: PNimrodNode): string {.compileTime, inline.} =
         return $node[0]
     of nnkIdent:
         return $node
+    of nnkPostfix:
+        return identName(node[1])
     else:
         quit "Invalid token (expected identifier): " & $node.kind
 
@@ -117,28 +119,68 @@ macro tagdef*(content: stmt): stmt {.immediate.} =
     ## This macro is to be used as pragma on a proc returning
     ## a TTagList.
 
-    result = copyNimTree(content)
+    assert content.kind == nnkProcDef
+    let cacheVar = identName(content[0]) & "Cache"
+
     var
         stmtListIndex =  -1
         i = 0
-    for child in result.children:
+    for child in content.children:
         if child.kind == nnkStmtList:
             stmtListIndex = i
             break
         inc(i)
-
     if stmtListIndex < 0:
         quit "Error: empty proc"
 
-    var stmts = newNimNode(nnkStmtList, content[stmtListIndex])
+    var bodyStmts = newNimNode(nnkStmtList, content[stmtListIndex])
 
-    # initialize result
-    var initTableExpr = newNimNode(nnkBracketExpr, content)
-    initTableExpr.add(newIdentNode("initTable"))
-    initTableExpr.add(newIdentNode("string"))
-    initTableExpr.add(newIdentNode("TTagDef"))
-    let initTableCall = newCall(initTableExpr)
-    stmts.add(newAssignment(newIdentNode("result"), initTableCall))
+    # initialize cache variable (we only want to parse stuff once)
+    block headers:
+        result = newNimNode(nnkStmtList)
+        var
+            varSection = newNimNode(nnkVarSection)
+            identDefs  = newNimNode(nnkIdentDefs)
+            pragmaExpr = newNimNode(nnkPragmaExpr)
+            pragmaNode = newNimNode(nnkPragma)
+            call = newNimNode(nnkCall)
+            bracketExpr = newNimNode(nnkBracketExpr)
+        pragmaExpr.add(newIdentNode(cacheVar))
+        pragmaNode.add(newIdentNode("compileTime"))
+        pragmaExpr.add(pragmaNode)
+        #identDefs.add(pragmaExpr)
+        identDefs.add(newIdentNode(cacheVar)) # see below, issue 903
+        identDefs.add(newNimNode(nnkEmpty))
+        bracketExpr.add(newIdentNode("initTable"))
+        bracketExpr.add(newIdentNode("string"))
+        bracketExpr.add(newIdentNode("TTagDef"))
+        call.add(bracketExpr)
+        identDefs.add(call)
+        varSection.add(identDefs)
+        # Doesn't work because of https://github.com/Araq/Nimrod/issues/903
+        #result.add(varSection)
+
+        var
+            outProc  = copyNimTree(content)
+            outStmts = newNimNode(nnkStmtList)
+
+            ifStmt = newNimNode(nnkIfStmt)
+            elifBranch = newNimNode(nnkElifBranch)
+            infix      = newNimNode(nnkInfix)
+            dotExpr    = newNimNode(nnkDotExpr)
+        dotExpr.add(newIdentNode(cacheVar))
+        dotExpr.add(newIdentNode("len"))
+        infix.add(newIdentNode("=="))
+        infix.add(dotExpr)
+        infix.add(newIntLitNode(0))
+        elifBranch.add(infix)
+        elifBranch.add(bodyStmts)
+        ifStmt.add(elifBranch)
+        outStmts.add(varSection) # see above, issue 903
+        outStmts.add(ifStmt)
+        outStmts.add(newAssignment(newIdentNode("result"), newIdentNode(cacheVar)))
+        outProc[stmtListIndex] = outStmts
+        result.add(outProc)
 
     var definedTags: seq[string] = newSeq[string]()
     
@@ -205,7 +247,7 @@ macro tagdef*(content: stmt): stmt {.immediate.} =
                 assignment = newNimNode(nnkAsgn, child)
                 bracketExpr = newNimNode(nnkBracketExpr, child)
                 par = newNimNode(nnkPar, child)
-            bracketExpr.add(newIdentNode("result"))
+            bracketExpr.add(newIdentNode(cacheVar))
             bracketExpr.add(newStrLitNode(tag))
             assignment.add(bracketExpr)
 
@@ -224,6 +266,5 @@ macro tagdef*(content: stmt): stmt {.immediate.} =
             par.add(buildSet("requiredAttrs", requiredAttrs))
             par.add(buildSet("optionalAttrs", optionalAttrs))
             assignment.add(par)
-            stmts.add(assignment)
-
-    result[stmtListIndex] = stmts
+            bodyStmts.add(assignment)
+    echo treeRepr(result)

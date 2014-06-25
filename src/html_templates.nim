@@ -1,5 +1,5 @@
 import
-    macros, tables, strutils, impl.writer, impl.htmltags, sets
+    macros, tables, strutils, impl.writer, html5, sets
 
 # interface
 
@@ -125,7 +125,7 @@ proc copyNodeParseChildren(htmlTag: string,
                            node: PNimrodNode, depth: int,
                            mode: var TOutputMode): PNimrodNode =
     var
-        childWriter = newStmtListWriter(htmltags())
+        childWriter = newStmtListWriter(html5tags())
     result = copyNimNode(node)
     for child in node.children:
         if child.kind == nnkStmtList:
@@ -254,7 +254,7 @@ proc html_template_impl(content: PNimrodNode, doctype: bool): PNimrodNode =
         of nnkStmtList:
             var
                 mode = blockmode
-                writer = newStmtListWriter(htmltags())
+                writer = newStmtListWriter(html5tags())
             if doctype:
                 writer.addString("<!DOCTYPE html>\n")
             processChilds(writer, "", child, -1, mode)
