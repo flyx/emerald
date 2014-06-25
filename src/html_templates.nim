@@ -106,20 +106,23 @@ proc processChilds(writer: var PStmtListWriter, htmlTag: string,
         of nnkAsgn, nnkVarSection, nnkDiscardStmt:
             writer.addNode(copyNimTree(child))
         of nnkCommand:
-            assert child.len == 2
-            assert child[0].kind == nnkIdent
+            if child.len != 2:
+                quit child.lineInfo & ": Command with unexpected number of parameters"
             case identName(child[0]):
             of "call":
                 writer.addNode(copyNimTree(child[1]))
             of "put":
                 writer.addEscapedStringExpr(copyNimTree(child[1]))
+            else:
+                quit child.lineInfo & ": Unknown command \"" & identName(child[0]) & "\""
         of nnkIncludeStmt:
-            assert child[0].kind == nnkCall
+            if child[0].kind != nnkCall:
+                quit child.lineInfo & ": Unexpected include param (" & $child[0].kind & ")"
             var call = copyNimTree(child[0])
             call.insert(1, newIdentNode("o"))
             writer.addNode(call)
         else:
-            quit "Unexpected node type (" & $child.kind & ")"
+            quit child.lineInfo() & ": Unexpected node type (" & $child.kind & ")"
 
 proc copyNodeParseChildren(htmlTag: string,
                            node: PNimrodNode, depth: int,
@@ -155,7 +158,8 @@ proc processNode(writer: var PStmtListWriter, parent: PNimrodNode,
     of nnkDotExpr:
         var first = true
         for node in parent[0].children:
-            assert(node.kind == nnkIdent or node.kind == nnkAccQuoted)
+            if not (node.kind == nnkIdent or node.kind == nnkAccQuoted):
+                quit parent[0].lineInfo & ": Unexpected node (" & $node.kind & ")"
             if first:
                 name = identName(node)
                 first = false
@@ -163,10 +167,10 @@ proc processNode(writer: var PStmtListWriter, parent: PNimrodNode,
                 var className: string = identName(node)
                 add(classes, className)
     else:
-        quit "Unexpected node type (" & $parent[0].kind & ")"
+        quit parent[0].lineInfo & ": Unexpected node type (" & $parent[0].kind & ")"
 
     if not writer.tags.hasKey(name):
-        quit "Unknown HTML tag: " & name
+        quit parent[0].lineInfo & ": Unknown HTML tag \"" & name & "\""
 
     let tagProps = writer.tags[name]
 
@@ -192,10 +196,11 @@ proc processNode(writer: var PStmtListWriter, parent: PNimrodNode,
         if not (childName in globalAttributes or
                 childName in tagProps.requiredAttrs or
                 childName in tagProps.optionalAttrs):
-            quit "Attribute \"" & childName &
-                 "\" not allowed in tag \"" & name & "\""
+            quit parent[childIndex][0].lineInfo & ": Attribute \"" &
+                childName & "\" not allowed in tag \"" & name & "\""
         if childName in parsedAttributes:
-            quit "Duplicate attribute: " & childName
+            quit parent[childIndex][0].lineInfo &
+                ": Duplicate attribute: " & childName
         parsedAttributes.incl(childName)
         processAttribute(writer, childName, parent[childIndex][1])
         inc(childIndex)
@@ -208,7 +213,8 @@ proc processNode(writer: var PStmtListWriter, parent: PNimrodNode,
             missing.excl(item)
         for item in missing:
             msg.add(item & ", ")
-        quit "The following mandatory attributes are missing on tag \"" &
+        quit parent.lineInfo &
+             ": The following mandatory attributes are missing on tag \"" &
              name & "\": " & msg
 
     if childIndex < parent.len:
@@ -262,4 +268,4 @@ proc html_template_impl(content: PNimrodNode, doctype: bool): PNimrodNode =
         of nnkEmpty, nnkPragma, nnkIdent:
             result.add(copyNimTree(child))
         else:
-            quit "Unexpected node in template proc def: " & $child.kind
+            quit child.lineInfo & ": Unexpected node in template proc def: " & $child.kind

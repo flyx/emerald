@@ -145,7 +145,7 @@ literals (for JavaScript and such). It strips leading and trailing whitespace pe
 line and adds its own indentation instead so that the output looks nice.
 
 The characters `<`, `>` and `&` are converted to their corresponding HTML
-entity automatically. It Attribute values, the characters `'` and `"` are
+entity automatically. For attribute values, the characters `'` and `"` are
 also converted.
 
 ### Control structures
@@ -249,11 +249,9 @@ your HTML hierarchy.
 
 ### Error Handling
 
-**TODO:**
-
-The code currently uses some `quit` statements and some `assert`s to deal with
-errors. It should always report the proper file and line of the input where the
-error occurred.
+If your code contains errors, you'll get an error message pointing to the file
+and line of the error along with a message about what's wrong. Much like the
+Nimrod compiler itself does it.
 
 ## License
 
