@@ -1,5 +1,5 @@
 import
-    macros, tables, strutils, impl.writer, sets
+    macros, tables, strutils, impl.writer, impl.htmltags, sets
 
 # interface
 
@@ -125,7 +125,7 @@ proc copyNodeParseChildren(htmlTag: string,
                            node: PNimrodNode, depth: int,
                            mode: var TOutputMode): PNimrodNode =
     var
-        childWriter = newStmtListWriter()
+        childWriter = newStmtListWriter(htmltags())
     result = copyNimNode(node)
     for child in node.children:
         if child.kind == nnkStmtList:
@@ -220,7 +220,7 @@ proc processNode(writer: var PStmtListWriter, parent: PNimrodNode,
             writer.addString(repeatChar(4 * depth, ' ') & "</" & name & ">")
         else:
             writer.addString("</" & name & ">")
-    elif tagProps.instaClosable:
+    elif tagProps.tagOmission:
         writer.addString(" />")
     else:
         writer.addString("></" & name & ">")
@@ -235,7 +235,6 @@ proc html_template_impl(content: PNimrodNode, doctype: bool): PNimrodNode =
     ## code will append its output to this variable.
     assert content.kind == nnkProcDef
 
-    echo treeRepr(content)
     result = newNimNode(nnkProcDef, content)
 
     for child in content.children:
@@ -255,7 +254,7 @@ proc html_template_impl(content: PNimrodNode, doctype: bool): PNimrodNode =
         of nnkStmtList:
             var
                 mode = blockmode
-                writer = newStmtListWriter()
+                writer = newStmtListWriter(htmltags())
             if doctype:
                 writer.addString("<!DOCTYPE html>\n")
             processChilds(writer, "", child, -1, mode)

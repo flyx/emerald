@@ -1,4 +1,4 @@
-import macros, htmltags
+import macros, ../../src/tagdef
 
 type
     TStmtListWriter = tuple
@@ -8,9 +8,9 @@ type
 
     PStmtListWriter* = ref TStmtListWriter not nil
 
-proc newStmtListWriter*(lineRef: PNimrodNode = nil): PStmtListWriter {.compileTime.} =
+proc newStmtListWriter*(tags: TTagList, lineRef: PNimrodNode = nil): PStmtListWriter {.compileTime.} =
     new(result)
-    result.tags = tags()
+    result.tags = tags
     result.output = newNimNode(nnkStmtList, lineRef)
     result.literalStringCache = ""
 

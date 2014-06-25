@@ -104,9 +104,8 @@ This list of features grows as things get implemented.
 
 ### HTML tags
 
-Currently, only a small list of HTML tags are supported, most of them are used
-in the example above. More will be added. There are two ways of specifying HTML
-tags:
+All HTML tags that are valid HTML 5 are allowed. Deprecated tags and attributes
+are *not* allowed. There are two ways to add HTML tags:
 
  * As block nodes: The HTML nodes start a block, which contains the content of
    the node.
@@ -116,9 +115,9 @@ tags:
        title: "Page title"
    ```
 
- * As function calls: The HTML nodes look like procedure calls. These calls must
-   not be used in expressions, but as standalone statements (this may change in
-   the future).
+ * As function calls: The HTML nodes look like procedure calls. These calls
+   must not be used in expressions, but as standalone statements. Any calls
+   used as part of an expression will be resolved as usual nimrod calls.
 
    ```nimrod
    p: "Some text"; br(); "Some more text"
@@ -128,11 +127,15 @@ tags:
 
 Because the `div` tag is used so frequently, it has `d` as shorthand.
 
+The structure will get validated when it is parsed. This validator doesn't
+check against the complete HTML 5 specification, but it is intelligent enough
+to tell you when you use tags at places where they are forbidden. It also won't
+accept tag names it doesn't know.
+
 **TODO:**
 
-Most HTML elements are currently not supported because they all need to be
-properly declared in the code (with all rules that should apply to them). I
-will do this once the base system is in a usable state.
+Currently, most of the validator checks are already specified in the code, but
+not yet implemented. 
 
 ### String content
 
@@ -140,6 +143,10 @@ String content can be included as string literals. Long literals and infix
 operators work, too. NimHTML tries to preserve indentation within long string
 literals (for JavaScript and such). It strips leading and trailing whitespace per
 line and adds its own indentation instead so that the output looks nice.
+
+**TODO:**
+
+Escape HTML characters within string content.
 
 ### Control structures
 
