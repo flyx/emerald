@@ -1,4 +1,4 @@
-include ../src/html5
+include ../src/html_templates
 import streams
 
 proc mac() {.html_template_macro.} =
