@@ -22,7 +22,11 @@ macro html_template_macro*(content: stmt): stmt {.immediate.} =
 proc processAttribute(writer: PStmtListWriter,
                       name  : string, value: PNimrodNode) {.compileTime.} =
     ## generate code that adds an HTML tag attribute to the output
-    writer.addString(" " & name & "=\"")
+    var attrName = ""
+    for c in name:
+        if c == '_': attrName.add('-')
+        else: attrName.add(c)
+    writer.addString(" " & attrName & "=\"")
     writer.addEscapedStringExpr(copyNimTree(value), true)
     writer.addString("\"")
 

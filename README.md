@@ -188,6 +188,10 @@ ommit the `id = ` and just write:
 body("myId"):
 ```
 
+There are a few HTML attributes that have a minus (`-`) in their name. You
+have to write them with an underscore, because a minus cannot be part of a
+name. So, just write for example `http_equiv` instead of `http-equiv`.
+
 ### Calling Nimrod procs
 
 You can call any visible proc that does not return a value from anywhere by

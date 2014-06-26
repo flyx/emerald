@@ -8,6 +8,7 @@ proc templ() {.html_template.} =
     html(lang = "en"):
         head:
             title: "pageTitle"
+            meta(http_equiv="content-type", content="text/html; charset=UTF-8")
         body:
             d.forTest:
                 for i in 1..10:
