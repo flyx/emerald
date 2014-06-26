@@ -35,8 +35,8 @@ proc enter*(context: PContext, tag: TTagDef): PContext =
     new(result)
     result.mode = if context.mode == flowmode: flowmode else: unknown
     result.nodeDepth = context.nodeDepth + 1
-    result.forbiddenTags = context.forbiddenTags or tag.forbiddenTags
-    result.forbiddenCategories = context.forbiddenCategories or tag.forbiddenContent
+    result.forbiddenTags = context.forbiddenTags + tag.forbiddenTags
+    result.forbiddenCategories = context.forbiddenCategories + tag.forbiddenContent
     if tag.permittedContent.contains(transparent):
         result.permittedContent = context.permittedContent
         result.permittedTags = context.permittedTags

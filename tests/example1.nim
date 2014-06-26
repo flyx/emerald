@@ -1,8 +1,6 @@
-include ../src/html_templates
+include ../emerald/html_templates
 
-import streams
-
-proc templ(youAreUsingNimHTML: bool) {.html_template.} =
+proc templ(youAreUsingEmerald: bool) {.html_template.} =
     html(lang = "en"):
         head:
             title: "pageTitle"
@@ -12,15 +10,15 @@ proc templ(youAreUsingNimHTML: bool) {.html_template.} =
                 }
                 """
         body:
-            h1: "NimHTML - Nimrod HTML5 templating engine"
+            h1: "Emerald - Nimrod HTML5 templating engine"
             d.content:
-                if youAreUsingNimHTML:
+                if youAreUsingEmerald:
                     p:
                         "You are amazing"; br(); "Continue."
                 else:
                     p: "Get on it!"
                 p: """
-                   NimHTML is a macro-based type-safe
+                   Emerald is a macro-based type-safe
                    templating engine which validates your
                    HTML structure and relieves you from
                    the ugly mess that HTML code is.

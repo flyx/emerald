@@ -1,5 +1,8 @@
-import
-    macros, tables, strutils, impl.writer, impl.context, html5, sets
+static:
+    import
+        macros, tables, strutils, private.writer, private.context, html5, sets
+
+import streams
 
 # interface
 

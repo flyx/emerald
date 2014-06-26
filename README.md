@@ -2,7 +2,7 @@
 
 ## Overview
 
-NimHTML is a macro-based type-safe templating engine for producing well-formed
+Emerald is a macro-based type-safe templating engine for producing well-formed
 HTML 5 web pages with Nimrod. It's currently under development. Most features
 are still missing.
 
@@ -18,7 +18,7 @@ restrictions and rules of the specification. Rules that are covered are:
  * HTML tags must have attributes and childs that are required by the
    specification.
 
-NimHTML has been inspired by [Jade][1] and [HAML][2]. But it doesn't use
+Emerald has been inspired by [Jade][1] and [HAML][2]. But it doesn't use
 RegEx for parsing its templates like Jade does *HOW COULD YOU EVEN THINK OF
 DOING THAT SERIOUSLY*. Instead, it uses the awesome Nimrod compile-time
 infrastructure.
@@ -26,7 +26,7 @@ infrastructure.
 Here is an example template to demonstrate what already works:
 
 ```nimrod
-proc templ(youAreUsingNimHTML: bool) {.html_template.} =
+proc templ(youAreUsingEmerald: bool) {.html_template.} =
     html(lang = "en"):
         head:
             title: "pageTitle"
@@ -36,15 +36,15 @@ proc templ(youAreUsingNimHTML: bool) {.html_template.} =
                 }
                 """
         body:
-            h1: "NimHTML - Nimrod HTML5 templating engine"
+            h1: "Emerald - Nimrod HTML5 templating engine"
             d.content:
-                if youAreUsingNimHTML:
+                if youAreUsingEmerald:
                     p:
                         "You are amazing"; br(); "Continue."
                 else:
                     p: "Get on it!"
                 p: """
-                   NimHTML is a macro-based type-safe
+                   Emerald is a macro-based type-safe
                    templating engine which validates your
                    HTML structure and relieves you from
                    the ugly mess that HTML code is.
@@ -65,11 +65,11 @@ This produces:
         </script>
     </head>
     <body>
-        <h1>NimHTML - Nimrod HTML5 templating engine</h1>
+        <h1>Emerald - Nimrod HTML5 templating engine</h1>
         <div class="content">
             <p>You are amazing<br />Continue.</p>
             <p>
-                NimHTML is a macro-based type-safe
+                Emerald is a macro-based type-safe
                 templating engine which validates your
                 HTML structure and relieves you from
                 the ugly mess that HTML code is.
@@ -81,19 +81,40 @@ This produces:
 
 ## Usage
 
-NimHTML templates are written as procedures. Just write a procedure
+Emerald templates are written as procedures. Just write a procedure
 declaration, add any parameters you need, and then add the pragma
 `html_template`. This will parse the contents of the procedure
 implementation as HTML template. To be able to use the template macros,
-you must **include** (not import) the module `html5`.
+you must **include** (not import) the module `emerald.html_templates`.
 
 To use the template, just call it by the name you gave it, **pass
 a `PStream` as first argument**, and give values for the parameters
 *you* declared afterwards. The `PStream` parameter is injected automatically,
-so you need to import the package `streams` from the standard library.
+and the `streams` package is imported automatically - do not import it again.
 
 The injected stream variable is named `ooooo`. I hope this name is ugly
 enough that no-one will accidentally use it for his or her own variables.
+
+### Hello, World
+
+Here's *Hello, World** in Emerald:
+
+```nimrod
+include emerald.html_templates
+
+proc hello() {.html_template.} =
+  html:
+    head:
+      title: "Hello, World!"
+    body:
+      p: "Hello, World!"
+
+
+hello(newFileStream(stdout))
+```
+
+Compile this with the Nimrod compiler and execute.
+
 
 ## Features
 
@@ -132,7 +153,7 @@ accept tag names it doesn't know.
 ### String content
 
 String content can be included as string literals. Long literals and infix
-operators work, too. NimHTML tries to preserve indentation within long string
+operators work, too. Emerald tries to preserve indentation within long string
 literals (for JavaScript and such). It strips leading and trailing whitespace per
 line and adds its own indentation instead so that the output looks nice.
 
@@ -238,8 +259,8 @@ proc templ() {.html_template.} =
 			include table(["first", "middle", "last"])
 ```
 
-NimHTML cannot validate whether the macro fits at the current position of
-your HTML hierarchy. Don't use `call` to call a NimHTML macro, it won't work.
+Emerald cannot validate whether the macro fits at the current position of
+your HTML hierarchy. Don't use `call` to call an Emerald macro, it won't work.
 
 ### Error Handling
 

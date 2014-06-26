@@ -1,5 +1,4 @@
-include ../src/html_templates
-import streams
+include ../emerald/html_templates
 
 proc mac() {.html_template_macro.} =
     "this is a macro"
@@ -26,7 +25,7 @@ proc templ() {.html_template.} =
             p.discardTest:
                 discard 1 + 1
             p.escapeTest(id = "\"escape\">-<\'test\' &&&"):
-                "Let's <see> whether \"NimHTML\" escapes & stuff *properly*."
+                "Let's <see> whether \"Emerald\" escapes & stuff *properly*."
             p.caseTest:
                 case 1:
                 of 2: "hurr"
