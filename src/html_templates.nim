@@ -103,7 +103,7 @@ proc processChilds(writer: PStmtListWriter, htmlTag: string,
                 writer.addString(repeatChar(4 * (context.depth + 1), ' ') &
                                  line[firstContentChar..line.len - 1] & "\n")
 
-        of nnkIfStmt, nnkWhenStmt:
+        of nnkIfStmt, nnkWhenStmt, nnkCaseStmt:
             var 
                 ifNode = newNimNode(child.kind, child)
 
@@ -136,15 +136,17 @@ proc processChilds(writer: PStmtListWriter, htmlTag: string,
 proc copyNodeParseChildren(writer: PStmtListWriter, htmlTag: string,
                            node: PNimrodNode,
                            context:  PContext): PNimrodNode =
-    var
-        childWriter = newStmtListWriter(writer.tags)
-    result = copyNimNode(node)
-    for child in node.children:
-        if child.kind == nnkStmtList:
-            processChilds(childWriter, htmlTag, child, context)
-        else:
-            result.add(copyNimTree(child))
-    result.add(childWriter.result)
+    if node.kind in [nnkElifBranch, nnkOfBranch, nnkElse, nnkForStmt, nnkWhileStmt]:
+        result = copyNimNode(node)
+        var childWriter = newStmtListWriter(writer.tags)
+        for child in node.children:
+            if child.kind == nnkStmtList:
+                processChilds(childWriter, htmlTag, child, context)
+            else:
+                result.add(copyNimTree(child))
+        result.add(childWriter.result)
+    else:
+        result = copyNimTree(node)
 
 proc processNode(writer: PStmtListWriter, parent: PNimrodNode,
                  context: PContext) =

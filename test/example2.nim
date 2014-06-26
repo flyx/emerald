@@ -26,6 +26,10 @@ proc templ() {.html_template.} =
                 discard 1 + 1
             p.escapeTest(id = "\"escape\">-<\'test\' &&&"):
                 "Let's <see> whether \"NimHTML\" escapes & stuff *properly*."
+            p.caseTest:
+                case 1:
+                of 2: "hurr"
+                else: "durr"
         when false:
             include foobar()
 

@@ -132,11 +132,6 @@ check against the complete HTML 5 specification, but it is intelligent enough
 to tell you when you use tags at places where they are forbidden. It also won't
 accept tag names it doesn't know.
 
-**TODO:**
-
-Currently, most of the validator checks are already specified in the code, but
-not yet implemented. 
-
 ### String content
 
 String content can be included as string literals. Long literals and infix
@@ -150,11 +145,7 @@ also converted.
 
 ### Control structures
 
-`if`, `elif`, `else`, `when`, `for` and `while` work exactly as in Nimrod.
-
-**TODO:**
-
- * Support `case`
+`if`, `elif`, `else`, `when`, `for`, `while` and `case` work exactly as in Nimrod.
 
 ### Variables
 
