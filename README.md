@@ -97,7 +97,7 @@ enough that no-one will accidentally use it for his or her own variables.
 
 ### Hello, World
 
-Here's *Hello, World** in Emerald:
+Here's *Hello, World* in Emerald:
 
 ```nimrod
 include emerald.html_templates
@@ -267,6 +267,24 @@ your HTML hierarchy. Don't use `call` to call an Emerald macro, it won't work.
 If your code contains errors, you'll get an error message pointing to the file
 and line of the error along with a message about what's wrong. Much like the
 Nimrod compiler itself does it.
+
+## API
+
+Emerald currently has 3 public modules:
+
+ * `html_templates`: The main module. Defines the templating macros
+ * `tagdef`: Supplies macros for easily definiing HTML tags and their
+   properties. This may be relevant for the user in the future when the
+   next iteration of the HTML standard allows the user to include custom
+   elements (there is already a working draft for that).
+ * `html5`: This defines the HTML tag set as specified by HTML 5. The user
+   might need access to it if he wishes to extend it, but the macros currently
+   don't allow passing custom tag sets. Oh, and there's also an `escapeHtml`
+   proc here, but as Emerald escapes all content strings automatically, you
+   normally shouldn't have to use it yourself.
+
+So as you see, only the `html_templates` module is currently usable externally.
+But it's always good to be prepared for the future!
 
 ## License
 
