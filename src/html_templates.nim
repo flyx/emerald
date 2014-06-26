@@ -61,7 +61,8 @@ proc processChilds(writer: PStmtListWriter, htmlTag: string,
                 writer.addString("\n")
             let childName = child.childNodeName
             if not writer.tags.hasKey(childName):
-                quit child.lineInfo & ": Unknown HTML tag \"" & childName & "\""
+                quit child.lineInfo & ": Unknown HTML tag \"" &
+                    childName & "\""
             let childTag  = writer.tags[childName]
             if context.accepts(childName, childTag):
                 processNode(writer, child, context.enter(childTag))
@@ -108,10 +109,12 @@ proc processChilds(writer: PStmtListWriter, htmlTag: string,
                 ifNode = newNimNode(child.kind, child)
 
             for ifBranch in child.children:
-                ifNode.add(copyNodeParseChildren(writer, htmlTag, ifBranch, context))
+                ifNode.add(copyNodeParseChildren(writer, htmlTag, ifBranch,
+                                                 context))
             writer.addNode(ifNode)
         of nnkForStmt, nnkWhileStmt:
-            writer.addNode(copyNodeParseChildren(writer, htmlTag, child, context))
+            writer.addNode(copyNodeParseChildren(writer, htmlTag, child,
+                                                 context))
         of nnkAsgn, nnkVarSection, nnkDiscardStmt:
             writer.addNode(copyNimTree(child))
         of nnkCommand:
@@ -123,20 +126,24 @@ proc processChilds(writer: PStmtListWriter, htmlTag: string,
             of "put":
                 writer.addEscapedStringExpr(copyNimTree(child[1]))
             else:
-                quit child.lineInfo & ": Unknown command \"" & identName(child[0]) & "\""
+                quit child.lineInfo & ": Unknown command \"" &
+                    identName(child[0]) & "\""
         of nnkIncludeStmt:
             if child[0].kind != nnkCall:
-                quit child.lineInfo & ": Unexpected include param (" & $child[0].kind & ")"
+                quit child.lineInfo & ": Unexpected include param (" &
+                    $child[0].kind & ")"
             var call = copyNimTree(child[0])
             call.insert(1, newIdentNode("o"))
             writer.addNode(call)
         else:
-            quit child.lineInfo() & ": Unexpected node type (" & $child.kind & ")"
+            quit child.lineInfo() & ": Unexpected node type (" &
+                $child.kind & ")"
 
 proc copyNodeParseChildren(writer: PStmtListWriter, htmlTag: string,
                            node: PNimrodNode,
                            context:  PContext): PNimrodNode =
-    if node.kind in [nnkElifBranch, nnkOfBranch, nnkElse, nnkForStmt, nnkWhileStmt]:
+    if node.kind in [nnkElifBranch, nnkOfBranch, nnkElse, nnkForStmt,
+                     nnkWhileStmt]:
         result = copyNimNode(node)
         var childWriter = newStmtListWriter(writer.tags)
         for child in node.children:
@@ -170,7 +177,8 @@ proc processNode(writer: PStmtListWriter, parent: PNimrodNode,
         var first = true
         for node in parent[0].children:
             if not (node.kind == nnkIdent or node.kind == nnkAccQuoted):
-                quit parent[0].lineInfo & ": Unexpected node (" & $node.kind & ")"
+                quit parent[0].lineInfo & ": Unexpected node (" &
+                    $node.kind & ")"
             if first:
                 name = identName(node)
                 first = false
@@ -178,7 +186,8 @@ proc processNode(writer: PStmtListWriter, parent: PNimrodNode,
                 var className: string = identName(node)
                 add(classes, className)
     else:
-        quit parent[0].lineInfo & ": Unexpected node type (" & $parent[0].kind & ")"
+        quit parent[0].lineInfo & ": Unexpected node type (" &
+            $parent[0].kind & ")"
 
     if not writer.tags.hasKey(name):
         quit parent[0].lineInfo & ": Unknown HTML tag \"" & name & "\""
@@ -204,18 +213,30 @@ proc processNode(writer: PStmtListWriter, parent: PNimrodNode,
             classString.add(class)
         writer.addString(" class=\"" & classString & "\"")
 
-    while childIndex < parent.len and parent[childIndex].kind == nnkExprEqExpr:
-        let childName = identName(parent[childIndex][0])
-        if not (globalAttributes.contains(childName) or
-                tagProps.requiredAttrs.contains(childName) or
-                tagProps.optionalAttrs.contains(childName)):
-            quit parent[childIndex][0].lineInfo & ": Attribute \"" &
-                childName & "\" not allowed in tag \"" & name & "\""
-        if parsedAttributes.contains(childName):
-            quit parent[childIndex][0].lineInfo &
-                ": Duplicate attribute: " & childName
-        parsedAttributes.incl(childName)
-        processAttribute(writer, childName, parent[childIndex][1])
+    while childIndex < parent.len and parent[childIndex].kind != nnkDo:
+        case parent[childIndex].kind:
+        of nnkExprEqExpr:
+            let childName = identName(parent[childIndex][0])
+            if not (globalAttributes.contains(childName) or
+                    tagProps.requiredAttrs.contains(childName) or
+                    tagProps.optionalAttrs.contains(childName)):
+                quit parent[childIndex][0].lineInfo & ": Attribute \"" &
+                    childName & "\" not allowed in tag \"" & name & "\""
+            if parsedAttributes.contains(childName):
+                quit parent[childIndex][0].lineInfo &
+                    ": Duplicate attribute: " & childName
+            parsedAttributes.incl(childName)
+            processAttribute(writer, childName, parent[childIndex][1])
+        of nnkStrLit:
+            if parsedAttributes.contains("id"):
+                quit parent[childIndex][0].lineInfo &
+                    ": Duplicate attribute: id"
+            else:
+                parsedAttributes.incl("id")
+                processAttribute(writer, "id", parent[childIndex])
+        else:
+            quit parent[childIndex].lineInfo & ": Unexpected token (" &
+                $parent[childIndex].kind & ")"
         inc(childIndex)
 
     if not (tagProps.requiredAttrs <= parsedAttributes):
@@ -235,7 +256,8 @@ proc processNode(writer: PStmtListWriter, parent: PNimrodNode,
         processChilds(writer, name, parent[childIndex], context)
 
         if context.mode == blockmode:
-            writer.addString(repeatChar(4 * context.depth, ' ') & "</" & name & ">")
+            writer.addString(repeatChar(4 * context.depth, ' ') & "</" &
+                name & ">")
         else:
             writer.addString("</" & name & ">")
     elif tagProps.tagOmission:
@@ -252,6 +274,8 @@ proc html_template_impl(content: PNimrodNode, isTemplate: bool): PNimrodNode =
     ## it is assumed that a variable "result" exists, and the generated
     ## code will append its output to this variable.
     assert content.kind == nnkProcDef
+
+    echo treeRepr(content)
 
     echo "parsing template \"" & identName(content[0]) & "\"..."
 

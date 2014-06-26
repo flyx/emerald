@@ -30,6 +30,7 @@ proc templ() {.html_template.} =
                 case 1:
                 of 2: "hurr"
                 else: "durr"
+            p.implicitIdTest("myId")
         when false:
             include foobar()
 

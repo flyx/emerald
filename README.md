@@ -155,13 +155,12 @@ a statement containing only their name. Example:
 
 ```nimrod
 var i = 10
-while i < 5:
+while i > 5:
 	i
 	i = i - 1
 ```
 
-Note that `inc(i, -1)` doesn't work here as all non-infix calls are parsed as
-HTML tag constructors.
+If you're wondering how to call `inc(i, -1)`, see *Calling Nimrod proc* below.
 
 ### HTML attributes
 
@@ -185,9 +184,12 @@ class names right behind the tag, separated with `.`, like this:
 body.class1.class2:
 ```
 
-**TODO:**
+There is also a shorthand notation for the `id` attribute: You can
+ommit the `id = ` and just write:
 
- * Provide a shorthand notation for `id`
+```nimrod
+body("myId"):
+```
 
 ### Calling Nimrod procs
 
@@ -236,7 +238,7 @@ proc templ() {.html_template.} =
 ```
 
 NimHTML cannot validate whether the macro fits at the current position of
-your HTML hierarchy.
+your HTML hierarchy. Don't use `call` to call a NimHTML macro, it won't work.
 
 ### Error Handling
 
