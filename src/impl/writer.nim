@@ -8,7 +8,10 @@ type
 
     PStmtListWriter* = ref TStmtListWriter not nil
 
-proc newStmtListWriter*(tags: TTagList, lineRef: PNimrodNode = nil): PStmtListWriter {.compileTime.} =
+const streamVarName* = "ooooo"
+
+proc newStmtListWriter*(tags: TTagList, lineRef: PNimrodNode = nil):
+        PStmtListWriter {.compileTime.} =
     new(result)
     result.tags = tags
     result.output = newNimNode(nnkStmtList, lineRef)
@@ -16,7 +19,8 @@ proc newStmtListWriter*(tags: TTagList, lineRef: PNimrodNode = nil): PStmtListWr
 
 proc consumeCache(writer : PStmtListWriter) {.compileTime.} =
     if writer.literalStringCache.len > 0:
-        writer.output.add(newCall(newIdentNode("write"), newIdentNode("o"),
+        writer.output.add(newCall(newIdentNode("write"),
+                          newIdentNode(streamVarName),
                           newStrLitNode(writer.literalStringCache)))
         writer.literalStringCache = ""
 
@@ -49,5 +53,5 @@ proc addEscapedStringExpr*(writer: PStmtListWriter, val: PNimrodNode,
         else:
             escapeCall = newCall(newIdentNode("escapeHtml"), copyNimTree(val))
 
-        writer.output.add(newCall(newIdentNode("write"), newIdentNode("o"),
-                          escapeCall))
+        writer.output.add(newCall(newIdentNode("write"),
+                          newIdentNode(streamVarName), escapeCall))

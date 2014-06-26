@@ -92,11 +92,8 @@ a `PStream` as first argument**, and give values for the parameters
 *you* declared afterwards. The `PStream` parameter is injected automatically,
 so you need to import the package `streams` from the standard library.
 
-**TODO:**
-
-The `PStream` variable is currently named `o`. Forbid the user to use
-that name on own variables, and, change the name to something the user
-will most certainly not come up with.
+The injected stream variable is named `ooooo`. I hope this name is ugly
+enough that no-one will accidentally use it for his or her own variables.
 
 ## Features
 

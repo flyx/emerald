@@ -3,7 +3,8 @@ import
 
 # interface
 
-proc html_template_impl(content: PNimrodNode, isTemplate: bool): PNimrodNode {.compileTime.}
+proc html_template_impl(content: PNimrodNode, isTemplate: bool):
+        PNimrodNode {.compileTime.}
 
 macro html_template*(content: stmt): stmt {.immediate.} =
     ## Use it as pragma on a proc. Parses the content of the proc as HTML
@@ -35,8 +36,9 @@ proc identName(node: PNimrodNode): string {.compileTime, inline.} =
     let name: string = if node.kind == nnkAccQuoted: $node[0] else: $node
     return if name == "d": "div" else: name
 
-proc copyNodeParseChildren(writer: PStmtListWriter, htmlTag: string, node: PNimrodNode,
-                           context: PContext): PNimrodNode {.compileTime.}
+proc copyNodeParseChildren(writer: PStmtListWriter, htmlTag: string,
+                           node: PNimrodNode, context: PContext):
+        PNimrodNode {.compileTime.}
 
 proc childNodeName(node: PNimrodNode): string {.compileTime.} =
     case node[0].kind:
@@ -119,7 +121,8 @@ proc processChilds(writer: PStmtListWriter, htmlTag: string,
             writer.addNode(copyNimTree(child))
         of nnkCommand:
             if child.len != 2:
-                quit child.lineInfo & ": Command with unexpected number of parameters"
+                quit child.lineInfo &
+                    ": Command with unexpected number of parameters"
             case identName(child[0]):
             of "call":
                 writer.addNode(copyNimTree(child[1]))
@@ -133,7 +136,7 @@ proc processChilds(writer: PStmtListWriter, htmlTag: string,
                 quit child.lineInfo & ": Unexpected include param (" &
                     $child[0].kind & ")"
             var call = copyNimTree(child[0])
-            call.insert(1, newIdentNode("o"))
+            call.insert(1, newIdentNode(streamVarName))
             writer.addNode(call)
         else:
             quit child.lineInfo() & ": Unexpected node type (" &
@@ -275,8 +278,6 @@ proc html_template_impl(content: PNimrodNode, isTemplate: bool): PNimrodNode =
     ## code will append its output to this variable.
     assert content.kind == nnkProcDef
 
-    echo treeRepr(content)
-
     echo "parsing template \"" & identName(content[0]) & "\"..."
 
     result = newNimNode(nnkProcDef, content)
@@ -288,9 +289,10 @@ proc html_template_impl(content: PNimrodNode, isTemplate: bool): PNimrodNode =
                 formalParams = copyNimTree(child)
                 identDef = newNimNode(nnkIdentDefs, child)
                 insertPos = 0
-            while insertPos < formalParams.len and formalParams[insertPos].kind == nnkEmpty:
+            while insertPos < formalParams.len and 
+                    formalParams[insertPos].kind == nnkEmpty:
                 inc(insertPos)
-            identDef.add(newIdentNode("o"))
+            identDef.add(newIdentNode(streamVarName))
             identDef.add(newIdentNode("PStream"))
             identDef.add(newNimNode(nnkEmpty))
             formalParams.insert(insertPos, identDef)
@@ -299,10 +301,12 @@ proc html_template_impl(content: PNimrodNode, isTemplate: bool): PNimrodNode =
             var writer = newStmtListWriter(html5tags())
             if isTemplate:
                 writer.addString("<!DOCTYPE html>\n")
-            processChilds(writer, "", child, initContext(not isTemplate, blockmode))
+            processChilds(writer, "", child,
+                          initContext(not isTemplate, blockmode))
             result.add(writer.result)
         of nnkEmpty, nnkPragma, nnkIdent:
             result.add(copyNimTree(child))
         else:
-            quit child.lineInfo & ": Unexpected node in template proc def: " & $child.kind
+            quit child.lineInfo &
+                ": Unexpected node in template proc def: " & $child.kind
     echo "done."
