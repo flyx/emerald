@@ -272,7 +272,7 @@ Nimrod compiler itself does it.
 
 Emerald currently has 3 public modules:
 
- * `html_templates`: The main module. Defines the templating macros
+ * `html_templates`: The main module. Defines the templating macros.
  * `tagdef`: Supplies macros for easily definiing HTML tags and their
    properties. This may be relevant for the user in the future when the
    next iteration of the HTML standard allows the user to include custom
@@ -284,7 +284,9 @@ Emerald currently has 3 public modules:
    normally shouldn't have to use it yourself.
 
 So as you see, only the `html_templates` module is currently usable externally.
-But it's always good to be prepared for the future!
+But it's always good to be prepared for the future! And by the way,
+`html_templates` isn't just called `templates` because I might want to add
+something similar to *LESS* in the future for CSS.
 
 ## License
 
