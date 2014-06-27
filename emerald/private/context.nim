@@ -8,9 +8,9 @@ type
         mode*: TOutputMode
         nodeDepth: int
         forbiddenTags: TSet[string]
-        forbiddenCategories: TSet[TContentCategory]
+        forbiddenCategories: set[TContentCategory]
         permittedTags: TSet[string]
-        permittedContent: TSet[TContentCategory]
+        permittedContent: set[TContentCategory]
 
     PContext* = ref TContext
 
@@ -19,10 +19,10 @@ proc initContext*(acceptAny: bool = false, mode: TOutputMode = unknown,
     new(result)
     result.mode = mode
     result.nodeDepth = indent
+    result.forbiddenCategories = {}
     result.forbiddenTags = initSet[string]()
-    result.forbiddenCategories = initSet[TContentCategory]()
+    result.permittedContent = {}
     result.permittedTags = initSet[string]()
-    result.permittedContent = initSet[TContentCategory]()
     if acceptAny:
         result.permittedContent.incl(any_content)
     else:
@@ -36,7 +36,11 @@ proc enter*(context: PContext, tag: TTagDef): PContext =
     result.mode = if context.mode == flowmode: flowmode else: unknown
     result.nodeDepth = context.nodeDepth + 1
     result.forbiddenTags = context.forbiddenTags + tag.forbiddenTags
-    result.forbiddenCategories = context.forbiddenCategories + tag.forbiddenContent
+    result.forbiddenCategories = context.forbiddenCategories
+    for i in tag.forbiddenContent: result.forbiddenCategories.incl(i)
+    # SIGSEGV! (probably a compiler bug; works at runtime, but not at compiletime)
+    #result.forbiddenCategories = context.forbiddenCategories + tag.forbiddenContent
+
     if tag.permittedContent.contains(transparent):
         result.permittedContent = context.permittedContent
         result.permittedTags = context.permittedTags

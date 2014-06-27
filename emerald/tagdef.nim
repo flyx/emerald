@@ -1,5 +1,5 @@
 import
-    sets, tables, macros, hashes
+    sets, tables, macros
 
 type
     TContentCategory* = enum
@@ -7,9 +7,9 @@ type
         sectioning_content, metadata_content, interactive_content,
         text_content, transparent, any_content
 
-    TTagDef* = tuple[contentCategories: TSet[TContentCategory],
-                     permittedContent : TSet[TContentCategory],
-                     forbiddenContent : TSet[TContentCategory],
+    TTagDef* = tuple[contentCategories: set[TContentCategory],
+                     permittedContent : set[TContentCategory],
+                     forbiddenContent : set[TContentCategory],
                      permittedTags : TSet[string],
                      forbiddenTags : TSet[string],
                      tagOmission   : bool,
@@ -17,9 +17,6 @@ type
                      optionalAttrs : TSet[string]]
 
     TTagList* = TTable[string, TTagDef]
-
-proc hash(val: TContentCategory): THash =
-    return THash(int(val))
 
 proc identName(node: PNimrodNode): string {.compileTime, inline.} =
     case node.kind:
@@ -91,11 +88,13 @@ proc buildSet(name: string, source: TSet[string]): PNimrodNode {.compileTime.} =
         content.add(newStrLitNode(item))
     return setBuilder("string", name, content)
 
-proc buildSet(name: string, source: TSet[TContentCategory]): PNimrodNode {.compileTime.} =
-    var content = newNimNode(nnkBracket)
+proc buildSet(name: string, source: set[TContentCategory]): PNimrodNode {.compileTime.} =
+    var content = newNimNode(nnkCurly)
     for item in source:
         content.add(newIdentNode($item))
-    return setBuilder("TContentCategory", name, content)
+    result = newNimNode(nnkExprColonExpr)
+    result.add(newIdentNode(name))
+    result.add(content)
 
 macro tagdef*(content: stmt): stmt {.immediate.} =
     ## define a set of tags with this macro. Structure is:
@@ -199,7 +198,7 @@ macro tagdef*(content: stmt): stmt {.immediate.} =
                 definedTags.add(tag)
             tags.incl(tag)
         var
-            contentCategories, permittedContent, forbiddenContent : TSet[TContentCategory] = initSet[TContentCategory]()
+            contentCategories, permittedContent, forbiddenContent : set[TContentCategory] = {}
             requiredAttrs, optionalAttrs, permittedTags, forbiddenTags : TSet[string] = initSet[string]()
             tagOmission: bool = false
         for child1 in child[1].children:
