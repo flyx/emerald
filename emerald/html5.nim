@@ -16,7 +16,7 @@ proc escapeHtml*(value : string, escapeQuotes: bool = false): string =
         else:
             result.add(c)
 
-proc html5tags*(): TTagList {.compileTime, tagdef.} =
+proc html5tags*(): PTagList {.compileTime, tagdef.} =
     a:
         content_categories = (flow_content, phrasing_content, interactive_content)
         permitted_content  = transparent

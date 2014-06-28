@@ -17,6 +17,7 @@ type
                      optionalAttrs : TSet[string]]
 
     TTagList* = TTable[string, TTagDef]
+    PTagList* = ref TTagList
 
 proc identName(node: PNimrodNode): string {.compileTime, inline.} =
     case node.kind:
@@ -116,7 +117,7 @@ macro tagdef*(content: stmt): stmt {.immediate.} =
     ##     ...
     ##
     ## This macro is to be used as pragma on a proc returning
-    ## a TTagList.
+    ## a PTagList.
 
     assert content.kind == nnkProcDef
     let cacheVar = identName(content[0]) & "Cache"
@@ -134,6 +135,11 @@ macro tagdef*(content: stmt): stmt {.immediate.} =
 
     var bodyStmts = newNimNode(nnkStmtList, content[stmtListIndex])
 
+    # we need that at some places
+    var derefProto = newNimNode(nnkBracketExpr)
+    #derefProto.add(newIdentNode(cacheVar)) # issue 1314
+    derefProto.add(newIdentNode("result"))  # do this instead
+
     # initialize cache variable (we only want to parse stuff once)
     block headers:
         result = newNimNode(nnkStmtList)
@@ -142,19 +148,14 @@ macro tagdef*(content: stmt): stmt {.immediate.} =
             identDefs  = newNimNode(nnkIdentDefs)
             pragmaExpr = newNimNode(nnkPragmaExpr)
             pragmaNode = newNimNode(nnkPragma)
-            call = newNimNode(nnkCall)
-            bracketExpr = newNimNode(nnkBracketExpr)
         pragmaExpr.add(newIdentNode(cacheVar))
         pragmaNode.add(newIdentNode("compileTime"))
         pragmaExpr.add(pragmaNode)
-        #identDefs.add(pragmaExpr)
-        identDefs.add(newIdentNode(cacheVar)) # see below, issue 903
+        #identDefs.add(pragmaExpr) # see below, issue 903
+        identDefs.add(newIdentNode(cacheVar))
+        #identDefs.add(newIdentNode("PTagList")) # cannot do that due to issue 1314
+        identDefs.add(newIdentNode("TTagList"))  # use this instead
         identDefs.add(newNimNode(nnkEmpty))
-        bracketExpr.add(newIdentNode("initTable"))
-        bracketExpr.add(newIdentNode("string"))
-        bracketExpr.add(newIdentNode("TTagDef"))
-        call.add(bracketExpr)
-        identDefs.add(call)
         varSection.add(identDefs)
         # Doesn't work because of https://github.com/Araq/Nimrod/issues/903
         #result.add(varSection)
@@ -165,21 +166,26 @@ macro tagdef*(content: stmt): stmt {.immediate.} =
 
             ifStmt = newNimNode(nnkIfStmt)
             elifBranch = newNimNode(nnkElifBranch)
-            infix      = newNimNode(nnkInfix)
-            dotExpr    = newNimNode(nnkDotExpr)
-        dotExpr.add(newIdentNode(cacheVar))
-        dotExpr.add(newIdentNode("len"))
-        infix.add(newIdentNode("=="))
-        infix.add(dotExpr)
-        infix.add(newIntLitNode(0))
-        elifBranch.add(infix)
+            bracketExpr = newNimNode(nnkBracketExpr)
+        #elifBranch.add(newCall(newIdentNode("isNil"), newIdentNode(cacheVar))) # 1314
+        elifBranch.add(newIdentNode("true"))
         elifBranch.add(bodyStmts)
         ifStmt.add(elifBranch)
         outStmts.add(varSection) # see above, issue 903
         outStmts.add(ifStmt)
-        outStmts.add(newAssignment(newIdentNode("result"), newIdentNode(cacheVar)))
+        #outStmts.add(newAssignment(newIdentNode("result"), newIdentNode(cacheVar))) # issue 1314
+        outStmts.add(newAssignment(copyNimTree(derefProto), newIdentNode(cacheVar))) # do this instead
         outProc[stmtListIndex] = outStmts
         result.add(outProc)
+
+        #bodyStmts.add(newCall(newIdentNode("new"), newIdentNode(cacheVar))) # issue 1314
+        bodyStmts.add(newCall(newIdentNode("new"), newIdentNode("result")))  # do this instead
+        bracketExpr.add(newIdentNode("initTable"))
+        bracketExpr.add(newIdentNode("string"))
+        bracketExpr.add(newIdentNode("TTagDef"))
+        #bodyStmts.add(newAssignment(copyNimTree(derefProto), newCall(bracketExpr))) # issue 1314
+        bodyStmts.add(newAssignment(newIdentNode(cacheVar), newCall(bracketExpr)))   # do this instead
+
 
     var definedTags: seq[string] = newSeq[string]()
     
@@ -266,3 +272,5 @@ macro tagdef*(content: stmt): stmt {.immediate.} =
             par.add(buildSet("optionalAttrs", optionalAttrs))
             assignment.add(par)
             bodyStmts.add(assignment)
+
+    echo "tags parsed"
