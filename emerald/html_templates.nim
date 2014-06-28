@@ -78,9 +78,9 @@ proc processChilds(writer: PStmtListWriter,
                 context.mode = blockmode
                 writer.addString("\n")
             let childName = child.childNodeName
-            if not writer.tags.hasKey(childName):
+            if not context.tags.hasKey(childName):
                 child.quitUnknown("HTM tag", childName)
-            let childTag  = writer.tags[childName]
+            let childTag  = context.tags[childName]
             if context.accepts(childTag):
                 processNode(writer, child, context.enter(childTag))
             else:
@@ -158,7 +158,7 @@ proc copyNodeParseChildren(writer: PStmtListWriter,
     if node.kind in [nnkElifBranch, nnkOfBranch, nnkElse, nnkForStmt,
                      nnkWhileStmt]:
         result = copyNimNode(node)
-        var childWriter = newStmtListWriter(writer.tags)
+        var childWriter = newStmtListWriter()
         for child in node.children:
             if child.kind == nnkStmtList:
                 processChilds(childWriter, child, context)
@@ -201,10 +201,10 @@ proc processNode(writer: PStmtListWriter, parent: PNimrodNode,
     else:
         parent[0].quitUnexpected("node type", parent[0].kind)
 
-    if not writer.tags.hasKey(name):
+    if not context.tags.hasKey(name):
         parent[0].quitUnknown("HTML tag", name)
     let
-        tagProps = writer.tags[name]
+        tagProps = context.tags[name]
         outputInBlockMode = (context.mode != flowmode)
 
     if outputInBlockMode:
@@ -303,14 +303,15 @@ proc html_template_impl(content: PNimrodNode, isTemplate: bool): PNimrodNode =
             formalParams.insert(insertPos, identDef)
             result.add(formalParams)
         of nnkStmtList:
-            var writer = newStmtListWriter(html5tags())
-            var primary = low(TExtendedTagId)
+            var
+                writer = newStmtListWriter()
+                primary = low(TExtendedTagId)
+                context = newContext(html5tags(), primary, blockmode)
             if isTemplate:
                 writer.addString("<!DOCTYPE html>\n")
             else:
-                primary = TExtendedTagId(writer.tags["html"].id)
-            processChilds(writer, child,
-                          initContext(primary, blockmode))
+                primary = TExtendedTagId(context.tags["html"].id)
+            processChilds(writer, child, context)
             result.add(writer.result)
         of nnkEmpty, nnkPragma, nnkIdent:
             result.add(copyNimTree(child))

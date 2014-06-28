@@ -4,8 +4,9 @@ type
     TOutputMode* = enum
         unknown, blockmode, flowmode
 
-    TContext* = object
-        mode*: TOutputMode
+    TContext = object
+        tagList: PTagList
+        outputMode: TOutputMode
         nodeDepth: int
         forbiddenTags: set[TTagId]
         forbiddenCategories: set[TContentCategory]
@@ -16,10 +17,20 @@ type
 
     TExtendedTagId* = range[(int(low(TTagId) - 1)) .. int(high(TTagId))]
 
-proc initContext*(primaryTagId : TExtendedTagId,
-                  mode: TOutputMode = unknown, indent: int = -1): PContext =
+proc tags*(context: PContext): PTagList {.inline, noSideEffect.} =
+    context.tagList
+
+proc mode*(context: PContext): TOutputMode {.inline, noSideEffect.} =
+    context.outputMode
+
+proc `mode=`*(context: PContext, val: TOutputMode) {.inline.} =
+    context.outputMode = val
+
+proc newContext*(tags: PTagList, primaryTagId : TExtendedTagId,
+                 mode: TOutputMode = unknown, indent: int = -1): PContext =
     new(result)
-    result.mode = mode
+    result.tagList = tags
+    result.outputMode = mode
     result.nodeDepth = indent
     result.forbiddenCategories = {}
     result.forbiddenTags = {}
@@ -35,7 +46,8 @@ proc depth*(context: PContext): int {.inline.} =
 
 proc enter*(context: PContext, tag: PTagDef): PContext =
     new(result)
-    result.mode = if context.mode == flowmode: flowmode else: unknown
+    result.tagList = context.tagList
+    result.outputMode = if context.mode == flowmode: flowmode else: unknown
     result.nodeDepth = context.nodeDepth + 1
     #result.forbiddenTags = context.forbiddenTags + tag.forbiddenTags
     result.forbiddenTags = context.forbiddenTags

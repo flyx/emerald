@@ -1,9 +1,7 @@
-
-import macros, "../tagdef", "../html5"
+import macros, "../html5"
 
 type
     TStmtListWriter = tuple
-        tags: PTagList
         output: PNimrodNode
         literalStringCache: string
 
@@ -11,10 +9,9 @@ type
 
 const streamVarName* = "ooooo"
 
-proc newStmtListWriter*(tags: PTagList, lineRef: PNimrodNode = nil):
+proc newStmtListWriter*(lineRef: PNimrodNode = nil):
         PStmtListWriter {.compileTime.} =
     new(result)
-    result.tags = tags
     result.output = newNimNode(nnkStmtList, lineRef)
     result.literalStringCache = ""
 
