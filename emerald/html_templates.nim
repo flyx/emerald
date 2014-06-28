@@ -42,8 +42,8 @@ proc processAttribute(writer: PStmtListWriter,
     writer.addEscapedStringExpr(copyNimTree(value), true)
     writer.addString("\"")
 
-proc processNode(writer: PStmtListWriter, parent: PNimrodNode,
-                 context: PContext) {.compileTime.}
+proc processNode(writer: PStmtListWriter, context: PContext,
+                 node: PNimrodNode) {.compileTime.}
 
 proc identName(node: PNimrodNode): string {.compileTime, inline.} =
     ## Used to be able to parse accent-quoted HTML tags as well.
@@ -71,7 +71,7 @@ proc processChilds(writer: PStmtListWriter,
     ## supported structures, generate the code of the compiled template.
     for child in parent.children:
         case child.kind:
-        of nnkEmpty, nnkFormalParams, nnkCommentStmt:
+        of nnkEmpty, nnkCommentStmt:
             continue
         of nnkCall:
             if context.mode == unknown:
@@ -82,11 +82,9 @@ proc processChilds(writer: PStmtListWriter,
                 child.quitUnknown("HTM tag", childName)
             let childTag  = context.tags[childName]
             if context.accepts(childTag):
-                processNode(writer, child, context.enter(childTag))
+                processNode(writer, context.enter(childTag), child)
             else:
                 quit child.lineInfo & ": Tag not permitted at this position."
-        of nnkStmtList:
-            processChilds(writer, child, context)
         of nnkInfix, nnkStrLit:
             if context.mode == unknown:
                 context.mode = flowmode
@@ -168,113 +166,114 @@ proc copyNodeParseChildren(writer: PStmtListWriter,
     else:
         result = copyNimTree(node)
 
-proc processNode(writer: PStmtListWriter, parent: PNimrodNode,
-                 context: PContext) =
-    ## Process one node the represents an HTML tag in the source tree.
+proc processNode(writer: PStmtListWriter, context: PContext,
+                 node: PNimrodNode) =
+    ## Process the header of the current node. This contains
+    ## the name of the HTML tag and its attributes. If the
+    ## node has any children, `child` will point to their nnkStmtList.
+    ## Else, it will be `nil`.
     let
         globalAttributes : TSet[string] = toSet([
                 "acceskey", "contenteditable", "contextmenu", "dir",
                 "draggable", "dropzone", "hidden", "id", "itemid",
                 "itemprop", "itemref", "itemscope", "itemtype",
                 "lang", "spellcheck", "style", "tabindex", "title"])
-    var
-        childIndex = 1
-        parsedAttributes : TSet[string] = initSet[string]()
-        name: string = ""
-        classes: seq[string] = newSeq[string]()
-
-    case parent[0].kind:
-    of nnkIdent, nnkAccQuoted:
-        name = identName(parent[0])
-    of nnkDotExpr:
-        var first = true
-        for node in parent[0].children:
-            if not (node.kind == nnkIdent or node.kind == nnkAccQuoted):
-                quit parent[0].lineInfo & ": Unexpected node (" &
-                    $node.kind & ")"
-            if first:
-                name = identName(node)
-                first = false
-            else:
-                var className: string = identName(node)
-                add(classes, className)
-    else:
-        parent[0].quitUnexpected("node type", parent[0].kind)
-
-    if not context.tags.hasKey(name):
-        parent[0].quitUnknown("HTML tag", name)
-    let
-        tagProps = context.tags[name]
         outputInBlockMode = (context.mode != flowmode)
 
-    if outputInBlockMode:
-        writer.addString(repeatChar(4 * context.depth, ' ') & "<" & name)
-    else:
-        writer.addString("<" & name)
+    var 
+        tag: PTagDef
+        tagName: string = nil
+        nodeChildList: PNimrodNode = nil
 
-    if classes.len > 0:
+    block tagNameAndClasses:
+        var classString: string = ""
+
+        case node[0].kind:
+        of nnkIdent, nnkAccQuoted:
+            tagName = identName(node[0])
+        of nnkDotExpr:
+            var first = true
+            for child in node[0].children:
+                if not (child.kind == nnkIdent or child.kind == nnkAccQuoted):
+                    quit node[0].lineInfo & ": Unexpected node (" &
+                        $child.kind & ")"
+                if first:
+                    tagName = identName(child)
+                    first = false
+                else:
+                    if classString.len > 0:
+                        classString.add(' ')
+                    classString.add(identName(child))
+        else:
+            node[0].quitUnexpected("node type", node[0].kind)
+        assert (not isNil(tagName))
+
+        tag = context.tags[tagName]
+        if isNil(tag):
+            node[0].quitUnknown("HTML tag", tagName)
+        if outputInBlockMode:
+            writer.addString(repeatChar(4 * context.depth, ' ') & "<" & tagName)
+        else:
+            writer.addString("<" & tagName)
+        if classString.len > 0:
+            writer.addString(" class=\"" & classString & "\"")
+
+    block attributes:
         var
             first = true
-            classString = ""
-        for class in classes:
+            parsedAttributes : TSet[string] = initSet[string]()
+        for child in node.children:
             if first:
                 first = false
+                continue
+            case child.kind:
+            of nnkExprEqExpr:
+                let childName = identName(child[0])
+                if not (globalAttributes.contains(childName) or
+                        tag.requiredAttrs.contains(childName) or
+                        tag.optionalAttrs.contains(childName)):
+                    quit child[0].lineInfo & ": Attribute \"" &
+                        childName & "\" not allowed in tag \"" & tagName & "\""
+                if parsedAttributes.contains(childName):
+                    child[0].quitDuplicate("attribute", childName)
+                parsedAttributes.incl(childName)
+                processAttribute(writer, childName, child[1])
+            of nnkStrLit:
+                if parsedAttributes.contains("id"):
+                    child[0].quitDuplicate("attribute", "id")
+                else:
+                    parsedAttributes.incl("id")
+                    processAttribute(writer, "id", child)
+            of nnkDo:
+                for doChild in child.children:
+                    if doChild.kind == nnkStmtList:
+                        nodeChildList = doChild
             else:
-                classString.add(" ")
-            classString.add(class)
-        writer.addString(" class=\"" & classString & "\"")
+                child.quitUnexpected("token", child.kind)
 
-    while childIndex < parent.len and parent[childIndex].kind != nnkDo:
-        case parent[childIndex].kind:
-        of nnkExprEqExpr:
-            let childName = identName(parent[childIndex][0])
-            if not (globalAttributes.contains(childName) or
-                    tagProps.requiredAttrs.contains(childName) or
-                    tagProps.optionalAttrs.contains(childName)):
-                quit parent[childIndex][0].lineInfo & ": Attribute \"" &
-                    childName & "\" not allowed in tag \"" & name & "\""
-            if parsedAttributes.contains(childName):
-                parent[childIndex][0].quitDuplicate("attribute", childName)
-            parsedAttributes.incl(childName)
-            processAttribute(writer, childName, parent[childIndex][1])
-        of nnkStrLit:
-            if parsedAttributes.contains("id"):
-                parent[childIndex][0].quitDuplicate("attribute", "id")
-            else:
-                parsedAttributes.incl("id")
-                processAttribute(writer, "id", parent[childIndex])
+        if not (tag.requiredAttrs <= parsedAttributes):
+            var
+                missing = tag.requiredAttrs
+                msg = ""
+            missing.excl(parsedAttributes)
+            for item in missing:
+                msg.add(item & ", ")
+            quit node.lineInfo &
+                 ": The following mandatory attributes are missing on tag \"" &
+                 tagName & "\": " & msg
+
+    block content:
+        if isNil(nodeChildList) and tag.tagOmission:
+            # TODO: do we really need to XML-like unclosed tags?
+            writer.addString(" />")
         else:
-            parent[childIndex].quitUnexpected("token", parent[childIndex].kind)
-        inc(childIndex)
-
-    if not (tagProps.requiredAttrs <= parsedAttributes):
-        var
-            missing = tagProps.requiredAttrs
-            msg = ""
-        for item in parsedAttributes:
-            missing.excl(item)
-        for item in missing:
-            msg.add(item & ", ")
-        quit parent.lineInfo &
-             ": The following mandatory attributes are missing on tag \"" &
-             name & "\": " & msg
-
-    if childIndex < parent.len:
-        writer.addString(">")
-        processChilds(writer, parent[childIndex], context)
-
-        if context.mode == blockmode:
-            writer.addString(repeatChar(4 * context.depth, ' ') & "</" &
-                name & ">")
-        else:
-            writer.addString("</" & name & ">")
-    elif tagProps.tagOmission:
-        writer.addString(" />")
-    else:
-        writer.addString("></" & name & ">")
-
-    if outputInBlockMode:
-        writer.addString("\n")
+            writer.addString(">")
+            if not isNil(nodeChildList):
+                processChilds(writer, nodeChildList, context)
+                if context.mode == blockmode:
+                    writer.addString(repeatChar(4 * context.depth, ' '))
+            writer.addString("</" & tagName & ">")
+        if outputInBlockMode: writer.addString("\n")
 
 proc html_template_impl(content: PNimrodNode, isTemplate: bool): PNimrodNode =
     ## parse the child tree of this node as HTML template. The macro
