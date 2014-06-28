@@ -20,9 +20,14 @@ type
                      tagOmission   : bool,
                      requiredAttrs : TSet[string],
                      optionalAttrs : TSet[string]]
+    PTagDef* = ref TTagDef not nil
 
-    TTagList* = TTable[string, TTagDef]
+    TTagList* = TTable[string, PTagDef]
     PTagList* = ref TTagList
+
+proc newPTagDef*(vals: TTagDef): PTagDef {.compileTime, inline.} =
+    new(result)
+    result[] = vals
 
 proc identName(node: PNimrodNode): string {.compileTime, inline.} =
     case node.kind:
@@ -214,7 +219,7 @@ macro tagdef*(content: stmt): stmt {.immediate.} =
         bodyStmts.add(newCall(newIdentNode("new"), newIdentNode("result")))  # do this instead
         bracketExpr.add(newIdentNode("initTable"))
         bracketExpr.add(newIdentNode("string"))
-        bracketExpr.add(newIdentNode("TTagDef"))
+        bracketExpr.add(newIdentNode("PTagDef"))
         #bodyStmts.add(newAssignment(copyNimTree(derefProto), newCall(bracketExpr))) # issue 1314
         bodyStmts.add(newAssignment(newIdentNode(cacheVar), newCall(bracketExpr)))   # do this instead
 
@@ -304,7 +309,5 @@ macro tagdef*(content: stmt): stmt {.immediate.} =
 
             par.add(buildSet("requiredAttrs", requiredAttrs))
             par.add(buildSet("optionalAttrs", optionalAttrs))
-            assignment.add(par)
+            assignment.add(newCall(newIdentNode("newPTagDef"), par))
             bodyStmts.add(assignment)
-
-    echo treeRepr(result)

@@ -33,7 +33,7 @@ proc initContext*(primaryTagId : TExtendedTagId,
 proc depth*(context: PContext): int {.inline.} =
     return context.nodeDepth
 
-proc enter*(context: PContext, tag: TTagDef): PContext =
+proc enter*(context: PContext, tag: PTagDef): PContext =
     new(result)
     result.mode = if context.mode == flowmode: flowmode else: unknown
     result.nodeDepth = context.nodeDepth + 1
@@ -52,7 +52,7 @@ proc enter*(context: PContext, tag: TTagDef): PContext =
         result.permittedTags = tag.permittedTags
         result.permittedContent = tag.permittedContent
 
-proc accepts*(context: PContext, tag: TTagDef): bool =
+proc accepts*(context: PContext, tag: PTagDef): bool =
     result = false
     if context.permittedContent.contains(any_content): return true
     if context.forbiddenTags.contains(tag.id): return false

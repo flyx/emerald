@@ -22,10 +22,19 @@ macro html_template_macro*(content: stmt): stmt {.immediate.} =
 
 # implementation
 
+template quitUnknown[T](node: PNimrodNode, what: string, val: T) =
+    quit node.lineInfo & ": Unknown " & what & ": \"" & $val & "\""
+
+template quitUnexpected[T](node: PNimrodNode, what: string, val: T) =
+    quit node.lineInfo & ": Unexpected " & what & ": \"" & $val & "\""
+
+template quitDuplicate[T](node: PNimrodNode, what: string, val: T) =
+    quit node.lineInfo & ": Duplicate " & what & ": \"" & $val & "\""
+
 proc processAttribute(writer: PStmtListWriter,
                       name  : string, value: PNimrodNode) {.compileTime.} =
     ## generate code that adds an HTML tag attribute to the output
-    var attrName = ""
+    var attrName = newStringOfCap(name.len)
     for c in name:
         if c == '_': attrName.add('-')
         else: attrName.add(c)
@@ -54,7 +63,7 @@ proc childNodeName(node: PNimrodNode): string {.compileTime.} =
     of nnkDotExpr:
         result = identName(node[0][0])
     else:
-        quit node.lineInfo & ": Unexpected token (" & $node[0].kind & ")"
+        node.quitUnexpected("token", node[0].kind)
 
 proc processChilds(writer: PStmtListWriter,
                    parent: PNimrodNode, context: PContext) {.compileTime.} =
@@ -70,8 +79,7 @@ proc processChilds(writer: PStmtListWriter,
                 writer.addString("\n")
             let childName = child.childNodeName
             if not writer.tags.hasKey(childName):
-                quit child.lineInfo & ": Unknown HTML tag \"" &
-                    childName & "\""
+                child.quitUnknown("HTM tag", childName)
             let childTag  = writer.tags[childName]
             if context.accepts(childTag):
                 processNode(writer, child, context.enter(childTag))
@@ -114,9 +122,7 @@ proc processChilds(writer: PStmtListWriter,
                                  line[firstContentChar..line.len - 1] & "\n")
 
         of nnkIfStmt, nnkWhenStmt, nnkCaseStmt:
-            var 
-                ifNode = newNimNode(child.kind, child)
-
+            var ifNode = newNimNode(child.kind, child)
             for ifBranch in child.children:
                 ifNode.add(copyNodeParseChildren(writer, ifBranch,
                                                  context))
@@ -136,18 +142,15 @@ proc processChilds(writer: PStmtListWriter,
             of "put":
                 writer.addEscapedStringExpr(copyNimTree(child[1]))
             else:
-                quit child.lineInfo & ": Unknown command \"" &
-                    identName(child[0]) & "\""
+                child.quitUnknown("command", identName(child[0]))
         of nnkIncludeStmt:
             if child[0].kind != nnkCall:
-                quit child.lineInfo & ": Unexpected include param (" &
-                    $child[0].kind & ")"
+                child.quitUnexpected("include param", child[0].kind)
             var call = copyNimTree(child[0])
             call.insert(1, newIdentNode(streamVarName))
             writer.addNode(call)
         else:
-            quit child.lineInfo() & ": Unexpected node type (" &
-                $child.kind & ")"
+            child.quitUnexpected("node type", child.kind)
 
 proc copyNodeParseChildren(writer: PStmtListWriter,
                            node: PNimrodNode,
@@ -196,12 +199,10 @@ proc processNode(writer: PStmtListWriter, parent: PNimrodNode,
                 var className: string = identName(node)
                 add(classes, className)
     else:
-        quit parent[0].lineInfo & ": Unexpected node type (" &
-            $parent[0].kind & ")"
+        parent[0].quitUnexpected("node type", parent[0].kind)
 
     if not writer.tags.hasKey(name):
-        quit parent[0].lineInfo & ": Unknown HTML tag \"" & name & "\""
-
+        parent[0].quitUnknown("HTML tag", name)
     let
         tagProps = writer.tags[name]
         outputInBlockMode = (context.mode != flowmode)
@@ -233,20 +234,17 @@ proc processNode(writer: PStmtListWriter, parent: PNimrodNode,
                 quit parent[childIndex][0].lineInfo & ": Attribute \"" &
                     childName & "\" not allowed in tag \"" & name & "\""
             if parsedAttributes.contains(childName):
-                quit parent[childIndex][0].lineInfo &
-                    ": Duplicate attribute: " & childName
+                parent[childIndex][0].quitDuplicate("attribute", childName)
             parsedAttributes.incl(childName)
             processAttribute(writer, childName, parent[childIndex][1])
         of nnkStrLit:
             if parsedAttributes.contains("id"):
-                quit parent[childIndex][0].lineInfo &
-                    ": Duplicate attribute: id"
+                parent[childIndex][0].quitDuplicate("attribute", "id")
             else:
                 parsedAttributes.incl("id")
                 processAttribute(writer, "id", parent[childIndex])
         else:
-            quit parent[childIndex].lineInfo & ": Unexpected token (" &
-                $parent[childIndex].kind & ")"
+            parent[childIndex].quitUnexpected("token", parent[childIndex].kind)
         inc(childIndex)
 
     if not (tagProps.requiredAttrs <= parsedAttributes):
@@ -317,6 +315,5 @@ proc html_template_impl(content: PNimrodNode, isTemplate: bool): PNimrodNode =
         of nnkEmpty, nnkPragma, nnkIdent:
             result.add(copyNimTree(child))
         else:
-            quit child.lineInfo &
-                ": Unexpected node in template proc def: " & $child.kind
+            child.quitUnexpected("node in template proc def", child.kind)
     echo "done."
