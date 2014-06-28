@@ -1,13 +1,18 @@
 import
     sets, tables, macros
 
+const maxTags = 256
+
 type
     TContentCategory* = enum
         flow_content, phrasing_content, embedded_content, heading_content,
         sectioning_content, metadata_content, interactive_content,
         text_content, transparent, any_content
 
-    TTagDef* = tuple[contentCategories: set[TContentCategory],
+    TTagId* = range[1 .. maxTags]
+
+    TTagDef* = tuple[id : TTagId,
+                     contentCategories: set[TContentCategory],
                      permittedContent : set[TContentCategory],
                      forbiddenContent : set[TContentCategory],
                      permittedTags : TSet[string],
@@ -247,14 +252,20 @@ macro tagdef*(content: stmt): stmt {.immediate.} =
             else:
                 quit "Unexpected node type: \"" & $child1.kind & "\""
 
+        var tagId = low(TTagId)
         for tag in tags:
             var
                 assignment = newNimNode(nnkAsgn, child)
                 bracketExpr = newNimNode(nnkBracketExpr, child)
                 par = newNimNode(nnkPar, child)
+                idExpr = newNimNode(nnkExprColonExpr)
             bracketExpr.add(newIdentNode(cacheVar))
             bracketExpr.add(newStrLitNode(tag))
             assignment.add(bracketExpr)
+
+            idExpr.add(newIdentNode("id"))
+            idExpr.add(newCall(newIdentNode("TTagId"), newIntLitNode(tagId)))
+            par.add(idExpr)
 
             par.add(buildSet("contentCategories", contentCategories))
             par.add(buildSet("permittedContent", permittedContent))
@@ -273,4 +284,11 @@ macro tagdef*(content: stmt): stmt {.immediate.} =
             assignment.add(par)
             bodyStmts.add(assignment)
 
-    echo "tags parsed"
+            if tagId == high(TTagId):
+                echo "WARNING: Reached maximum number of tags with tag \"" &
+                    tag & "\", ignoring any following nodes."
+                break
+            else:
+                inc(tagId)
+
+    echo treeRepr(result)
