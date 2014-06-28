@@ -1,8 +1,8 @@
 static:
     import
-        macros, tables, strutils, private.writer, private.context, html5, sets
+        macros, tables, strutils, private.writer, private.context, sets, tagdef
 
-import streams
+import streams, html5
 
 # interface
 
@@ -43,7 +43,7 @@ proc identName(node: PNimrodNode): string {.compileTime, inline.} =
     let name: string = if node.kind == nnkAccQuoted: $node[0] else: $node
     return if name == "d": "div" else: name
 
-proc copyNodeParseChildren(writer: PStmtListWriter, htmlTag: string,
+proc copyNodeParseChildren(writer: PStmtListWriter,
                            node: PNimrodNode, context: PContext):
         PNimrodNode {.compileTime.}
 
@@ -56,7 +56,7 @@ proc childNodeName(node: PNimrodNode): string {.compileTime.} =
     else:
         quit node.lineInfo & ": Unexpected token (" & $node[0].kind & ")"
 
-proc processChilds(writer: PStmtListWriter, htmlTag: string,
+proc processChilds(writer: PStmtListWriter,
                    parent: PNimrodNode, context: PContext) {.compileTime.} =
     ## Called on a nnkStmtList. Process all child nodes of the lists, parse
     ## supported structures, generate the code of the compiled template.
@@ -78,7 +78,7 @@ proc processChilds(writer: PStmtListWriter, htmlTag: string,
             else:
                 quit child.lineInfo & ": Tag not permitted at this position."
         of nnkStmtList:
-            processChilds(writer, htmlTag, child, context)
+            processChilds(writer, child, context)
         of nnkInfix, nnkStrLit:
             if context.mode == unknown:
                 context.mode = flowmode
@@ -118,11 +118,11 @@ proc processChilds(writer: PStmtListWriter, htmlTag: string,
                 ifNode = newNimNode(child.kind, child)
 
             for ifBranch in child.children:
-                ifNode.add(copyNodeParseChildren(writer, htmlTag, ifBranch,
+                ifNode.add(copyNodeParseChildren(writer, ifBranch,
                                                  context))
             writer.addNode(ifNode)
         of nnkForStmt, nnkWhileStmt:
-            writer.addNode(copyNodeParseChildren(writer, htmlTag, child,
+            writer.addNode(copyNodeParseChildren(writer, child,
                                                  context))
         of nnkAsgn, nnkVarSection, nnkDiscardStmt:
             writer.addNode(copyNimTree(child))
@@ -149,7 +149,7 @@ proc processChilds(writer: PStmtListWriter, htmlTag: string,
             quit child.lineInfo() & ": Unexpected node type (" &
                 $child.kind & ")"
 
-proc copyNodeParseChildren(writer: PStmtListWriter, htmlTag: string,
+proc copyNodeParseChildren(writer: PStmtListWriter,
                            node: PNimrodNode,
                            context:  PContext): PNimrodNode =
     if node.kind in [nnkElifBranch, nnkOfBranch, nnkElse, nnkForStmt,
@@ -158,7 +158,7 @@ proc copyNodeParseChildren(writer: PStmtListWriter, htmlTag: string,
         var childWriter = newStmtListWriter(writer.tags)
         for child in node.children:
             if child.kind == nnkStmtList:
-                processChilds(childWriter, htmlTag, child, context)
+                processChilds(childWriter, child, context)
             else:
                 result.add(copyNimTree(child))
         result.add(childWriter.result)
@@ -263,7 +263,7 @@ proc processNode(writer: PStmtListWriter, parent: PNimrodNode,
 
     if childIndex < parent.len:
         writer.addString(">")
-        processChilds(writer, name, parent[childIndex], context)
+        processChilds(writer, parent[childIndex], context)
 
         if context.mode == blockmode:
             writer.addString(repeatChar(4 * context.depth, ' ') & "</" &
@@ -311,7 +311,7 @@ proc html_template_impl(content: PNimrodNode, isTemplate: bool): PNimrodNode =
                 writer.addString("<!DOCTYPE html>\n")
             else:
                 primary = TExtendedTagId(writer.tags["html"].id)
-            processChilds(writer, "", child,
+            processChilds(writer, child,
                           initContext(primary, blockmode))
             result.add(writer.result)
         of nnkEmpty, nnkPragma, nnkIdent:
