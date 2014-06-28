@@ -73,7 +73,7 @@ proc processChilds(writer: PStmtListWriter, htmlTag: string,
                 quit child.lineInfo & ": Unknown HTML tag \"" &
                     childName & "\""
             let childTag  = writer.tags[childName]
-            if context.accepts(childName, childTag):
+            if context.accepts(childTag):
                 processNode(writer, child, context.enter(childTag))
             else:
                 quit child.lineInfo & ": Tag not permitted at this position."
@@ -306,10 +306,13 @@ proc html_template_impl(content: PNimrodNode, isTemplate: bool): PNimrodNode =
             result.add(formalParams)
         of nnkStmtList:
             var writer = newStmtListWriter(html5tags())
+            var primary = low(TExtendedTagId)
             if isTemplate:
                 writer.addString("<!DOCTYPE html>\n")
+            else:
+                primary = TExtendedTagId(writer.tags["html"].id)
             processChilds(writer, "", child,
-                          initContext(not isTemplate, blockmode))
+                          initContext(primary, blockmode))
             result.add(writer.result)
         of nnkEmpty, nnkPragma, nnkIdent:
             result.add(copyNimTree(child))

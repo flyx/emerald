@@ -15,8 +15,8 @@ type
                      contentCategories: set[TContentCategory],
                      permittedContent : set[TContentCategory],
                      forbiddenContent : set[TContentCategory],
-                     permittedTags : TSet[string],
-                     forbiddenTags : TSet[string],
+                     permittedTags : set[TTagId],
+                     forbiddenTags : set[TTagId],
                      tagOmission   : bool,
                      requiredAttrs : TSet[string],
                      optionalAttrs : TSet[string]]
@@ -101,6 +101,33 @@ proc buildSet(name: string, source: set[TContentCategory]): PNimrodNode {.compil
     result = newNimNode(nnkExprColonExpr)
     result.add(newIdentNode(name))
     result.add(content)
+
+proc buildSet(name: string, source: set[TTagId]): PNimrodNode {.compileTime.} =
+    var content = newNimNode(nnkCurly)
+    for item in source:
+        content.add(newCall(newIdentNode("TTagId"), newIntLitNode(item)))
+    result = newNimNode(nnkExprColonExpr)
+    result.add(newIdentNode(name))
+    result.add(content)
+
+proc tagIdFor(t: var TTable[string, tuple[id: TTagId, def: bool]],
+        counter: var TTagId, tag: string, definition: bool = false):
+        TTagId {.compileTime.} =
+    if t.hasKey(tag):
+        let val = t[tag]
+        result = val.id
+        if definition:
+            if val.def:
+                quit "Multiple definition of tag \"" & tag & "\"!"
+            else:
+                t[tag] = (val.id, true)
+    elif counter == high(TTagId):
+        quit "Too many tags!"
+    else:
+        inc(counter)
+        t[tag] = (counter, definition)
+        result = counter
+
 
 macro tagdef*(content: stmt): stmt {.immediate.} =
     ## define a set of tags with this macro. Structure is:
@@ -192,7 +219,10 @@ macro tagdef*(content: stmt): stmt {.immediate.} =
         bodyStmts.add(newAssignment(newIdentNode(cacheVar), newCall(bracketExpr)))   # do this instead
 
 
-    var definedTags: seq[string] = newSeq[string]()
+    var
+        definedTags: TTable[string, tuple[id :TTagId, def: bool]] =
+            initTable[string, tuple[id: TTagId, def: bool]]()
+        tagCounter = low(TTagId)
     
     for child in content[stmtListIndex].children:
         if child.kind != nnkCall:
@@ -201,16 +231,9 @@ macro tagdef*(content: stmt): stmt {.immediate.} =
             quit "Unexpected token (expected do): " & $child[1].kind
 
         var
-            tags = initSet[string]()
-        for tag in child[0].itemNames:
-            if tag in definedTags:
-                quit "Error: Tag \"" & tag & "\" defined twice!"
-            else:
-                definedTags.add(tag)
-            tags.incl(tag)
-        var
             contentCategories, permittedContent, forbiddenContent : set[TContentCategory] = {}
-            requiredAttrs, optionalAttrs, permittedTags, forbiddenTags : TSet[string] = initSet[string]()
+            permittedTags, forbiddenTags : set[TTagId] = {}
+            requiredAttrs, optionalAttrs : TSet[string] = initSet[string]()
             tagOmission: bool = false
         for child1 in child[1].children:
             case child1.kind:
@@ -231,10 +254,10 @@ macro tagdef*(content: stmt): stmt {.immediate.} =
                             forbiddenContent.incl(category)
                     of "permitted_tags":
                         for tag in assign[1].itemNames:
-                            permittedTags.incl(tag)
+                            permittedTags.incl(definedTags.tagIdFor(tagCounter, tag))
                     of "forbidden_tags":
                         for tag in assign[1].itemNames:
-                            forbiddenTags.incl(tag)
+                            forbiddenTags.incl(definedTags.tagIdFor(tagCounter, tag))
                     of "tag_omission":
                         assert assign[1].kind == nnkIdent
                         case $assign[1]:
@@ -252,13 +275,13 @@ macro tagdef*(content: stmt): stmt {.immediate.} =
             else:
                 quit "Unexpected node type: \"" & $child1.kind & "\""
 
-        var tagId = low(TTagId)
-        for tag in tags:
+        for tag in child[0].itemNames:
             var
                 assignment = newNimNode(nnkAsgn, child)
                 bracketExpr = newNimNode(nnkBracketExpr, child)
                 par = newNimNode(nnkPar, child)
                 idExpr = newNimNode(nnkExprColonExpr)
+                tagId = definedTags.tagIdFor(tagCounter, tag, true)
             bracketExpr.add(newIdentNode(cacheVar))
             bracketExpr.add(newStrLitNode(tag))
             assignment.add(bracketExpr)
@@ -283,12 +306,5 @@ macro tagdef*(content: stmt): stmt {.immediate.} =
             par.add(buildSet("optionalAttrs", optionalAttrs))
             assignment.add(par)
             bodyStmts.add(assignment)
-
-            if tagId == high(TTagId):
-                echo "WARNING: Reached maximum number of tags with tag \"" &
-                    tag & "\", ignoring any following nodes."
-                break
-            else:
-                inc(tagId)
 
     echo treeRepr(result)
