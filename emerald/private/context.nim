@@ -4,74 +4,90 @@ type
     TOutputMode* = enum
         unknown, blockmode, flowmode
 
+    TContextLevel = tuple
+        outputMode: TOutputMode
+        forbiddenCategories: set[TContentCategory]
+        forbiddenTags: set[TTagId]
+        permittedContent: set[TContentCategory]
+        permittedTags: set[TTagId]
+
     TContext = object
         tagList: PTagList
-        outputMode: TOutputMode
-        nodeDepth: int
-        forbiddenTags: set[TTagId]
-        forbiddenCategories: set[TContentCategory]
-        permittedTags: set[TTagId]
-        permittedContent: set[TContentCategory]
+        level: int
+        levelProps: seq[TContextLevel]
+
+        
 
     PContext* = ref TContext
 
     TExtendedTagId* = range[(int(low(TTagId) - 1)) .. int(high(TTagId))]
 
+template curLevel(): auto {.dirty.} = context.levelProps[context.level]
+
 proc tags*(context: PContext): PTagList {.inline, noSideEffect.} =
     context.tagList
 
 proc mode*(context: PContext): TOutputMode {.inline, noSideEffect.} =
-    context.outputMode
+    curLevel.outputMode
 
 proc `mode=`*(context: PContext, val: TOutputMode) {.inline.} =
-    context.outputMode = val
+    curLevel.outputMode = val
 
 proc newContext*(tags: PTagList, primaryTagId : TExtendedTagId,
-                 mode: TOutputMode = unknown, indent: int = -1): PContext =
+                 mode: TOutputMode = unknown): PContext =
     new(result)
     result.tagList = tags
-    result.outputMode = mode
-    result.nodeDepth = indent
-    result.forbiddenCategories = {}
-    result.forbiddenTags = {}
-    result.permittedContent = {}
-    result.permittedTags = {}
+    result.level = 0
+    result.levelProps = @[(
+            outputMode : mode,
+            forbiddenCategories : set[TContentCategory]({}),
+            forbiddenTags : set[TTagId]({}),
+            permittedContent : set[TContentCategory]({}),
+            permittedTags : set[TTagId]({})
+        )]
     if primaryTagId == low(TTagId) - 1:
-        result.permittedContent.incl(any_content)
+        result.levelProps[0].permittedContent.incl(any_content)
     else:
-        result.permittedTags.incl(TTagId(primaryTagId))
+        result.levelProps[0].permittedTags.incl(TTagId(primaryTagId))
 
 proc depth*(context: PContext): int {.inline.} =
-    return context.nodeDepth
+    return context.level - 1
 
-proc enter*(context: PContext, tag: PTagDef): PContext =
-    new(result)
-    result.tagList = context.tagList
-    result.outputMode = if context.mode == flowmode: flowmode else: unknown
-    result.nodeDepth = context.nodeDepth + 1
-    #result.forbiddenTags = context.forbiddenTags + tag.forbiddenTags
-    result.forbiddenTags = context.forbiddenTags
-    for i in tag.forbiddenTags: result.forbiddenTags.incl(i)
-    result.forbiddenCategories = context.forbiddenCategories
-    for i in tag.forbiddenContent: result.forbiddenCategories.incl(i)
+proc enter*(context: PContext, tag: PTagDef) =
     # SIGSEGV! (probably a compiler bug; works at runtime, but not at compiletime)
-    #result.forbiddenCategories = context.forbiddenCategories + tag.forbiddenContent
+    #forbiddenTags : context.forbiddenTags + tag.forbiddenTags
+    context.levelProps.add((
+            outputMode : if context.mode == flowmode: flowmode else: unknown,
+            forbiddenCategories : curLevel.forbiddenCategories,
+            forbiddenTags : curLevel.forbiddenTags,
+            permittedContent: if tag.permittedContent.contains(transparent):
+                curLevel.permittedContent
+                else: tag.permittedContent,
+            permittedTags : if tag.permittedContent.contains(transparent):
+                curLevel.permittedTags
+                else: tag.permittedTags
+        ))
+    inc(context.level)
 
-    if tag.permittedContent.contains(transparent):
-        result.permittedContent = context.permittedContent
-        result.permittedTags = context.permittedTags
-    else:
-        result.permittedTags = tag.permittedTags
-        result.permittedContent = tag.permittedContent
+    for i in tag.forbiddenTags:
+        curLevel.forbiddenTags.incl(i)
+    for i in tag.forbiddenContent: 
+        curLevel.forbiddenCategories.incl(i)
+
+proc exit*(context: PContext) =
+    assert context.level > 0
+    discard context.levelProps.pop()
+    inc(context.level, -1)
 
 proc accepts*(context: PContext, tag: PTagDef): bool =
     result = false
-    if context.permittedContent.contains(any_content): return true
-    if context.forbiddenTags.contains(tag.id): return false
-    if context.permittedTags.contains(tag.id): result = true
+    if curLevel.permittedContent.contains(any_content):
+        return true
+    if curLevel.forbiddenTags.contains(tag.id): return false
+    if curLevel.permittedTags.contains(tag.id): result = true
     for category in tag.contentCategories:
-        if context.forbiddenCategories.contains(category):
+        if curLevel.forbiddenCategories.contains(category):
             return false
-        if context.permittedContent.contains(category):
+        if curLevel.permittedContent.contains(category):
             result = true
     

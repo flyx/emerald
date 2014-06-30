@@ -4,6 +4,8 @@ static:
 
 import streams, html5
 
+type PTemplateBlock = proc(emeraldOutput: PStream) not nil
+
 # interface
 
 proc html_template_impl(content: PNimrodNode, isTemplate: bool):
@@ -82,7 +84,9 @@ proc processChilds(writer: PStmtListWriter,
                 child.quitUnknown("HTM tag", childName)
             let childTag  = context.tags[childName]
             if context.accepts(childTag):
-                processNode(writer, context.enter(childTag), child)
+                context.enter(childTag)
+                processNode(writer, context, child)
+                context.exit()
             else:
                 quit child.lineInfo & ": Tag not permitted at this position."
         of nnkInfix, nnkStrLit:
