@@ -150,7 +150,7 @@ proc processChilds(writer: PStmtListWriter,
             if child[0].kind != nnkCall:
                 child.quitUnexpected("include param", child[0].kind)
             var call = copyNimTree(child[0])
-            call.insert(1, newIdentNode(streamVarName))
+            call.insert(1, copyNimTree(writer.streamName))
             writer.addNode(call)
         of nnkBlockStmt:
             if child.len != 2 or (child[0].kind != nnkIdent and
@@ -169,7 +169,7 @@ proc copyNodeParseChildren(writer: PStmtListWriter,
     if node.kind in [nnkElifBranch, nnkOfBranch, nnkElse, nnkForStmt,
                      nnkWhileStmt]:
         result = copyNimNode(node)
-        var childWriter = newStmtListWriter()
+        var childWriter = newStmtListWriter(writer.streamName)
         for child in node.children:
             if child.kind == nnkStmtList:
                 processChilds(childWriter, child, context)
@@ -288,9 +288,10 @@ proc processNode(writer: PStmtListWriter, context: PContext,
             writer.addString("</" & tagName & ">")
         if outputInBlockMode: writer.addString("\n")
 
-proc createBlockProc(context: PContext, name: string, stmts: PNimrodNode): PNimrodNode {.compileTime.} =
+proc createBlockProc(context: PContext, streamName: PNimrodNode, name: string,
+                     stmts: PNimrodNode): PNimrodNode {.compileTime.} =
     var
-        writer = newStmtListWriter()
+        writer = newStmtListWriter(streamName)
         lambdaStmt = newNimNode(nnkLambda, stmts)
         formalParams = newNimNode(nnkFormalParams)
     # just copying the tree as it appears when inspecting a written lambda.
@@ -318,7 +319,11 @@ proc html_template_impl(content: PNimrodNode, isTemplate: bool): PNimrodNode =
     ## code will append its output to this variable.
     assert content.kind == nnkProcDef
 
+    echo "parsing template \"" & identName(content[0]) & "\"..."
+
     result = newNimNode(nnkProcDef, content)
+
+    let streamName = genSym(nskParam)
 
     for child in content.children:
         case child.kind:
@@ -330,14 +335,14 @@ proc html_template_impl(content: PNimrodNode, isTemplate: bool): PNimrodNode =
             while insertPos < formalParams.len and 
                     formalParams[insertPos].kind == nnkEmpty:
                 inc(insertPos)
-            identDef.add(newIdentNode(streamVarName))
+            identDef.add(streamName)
             identDef.add(newIdentNode("PStream"))
             identDef.add(newNimNode(nnkEmpty))
             formalParams.insert(insertPos, identDef)
             result.add(formalParams)
         of nnkStmtList:
             var
-                writer = newStmtListWriter()
+                writer = newStmtListWriter(streamName)
                 primary = low(TExtendedTagId)
                 context = newContext(html5tags(), primary, blockmode)
             if isTemplate:
@@ -349,7 +354,7 @@ proc html_template_impl(content: PNimrodNode, isTemplate: bool): PNimrodNode =
             if context.hasBlocks:
                 var varSection = newNimNode(nnkVarSection)
                 for name, stmts in context.blocks:
-                    varSection.add(createBlockProc(context, name, stmts))
+                    varSection.add(createBlockProc(context, streamName, name, stmts))
                 stmts.insert(0, varSection)
             result.add(stmts)
             

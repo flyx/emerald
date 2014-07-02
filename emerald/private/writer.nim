@@ -2,29 +2,33 @@ import macros, "../html5"
 
 type
     TStmtListWriter = tuple
+        streamIdent: PNimrodNode
         output: PNimrodNode
         literalStringCache: string
 
     PStmtListWriter* = ref TStmtListWriter not nil
 
-const streamVarName* = "emeraldStream"
-
-proc newStmtListWriter*(lineRef: PNimrodNode = nil):
+proc newStmtListWriter*(streamName: PNimrodNode, lineRef: PNimrodNode = nil):
         PStmtListWriter {.compileTime.} =
     new(result)
+    result.streamIdent = streamName
     result.output = newNimNode(nnkStmtList, lineRef)
     result.literalStringCache = ""
 
 proc consumeCache(writer : PStmtListWriter) {.compileTime.} =
     if writer.literalStringCache.len > 0:
         writer.output.add(newCall(newIdentNode("write"),
-                          newIdentNode(streamVarName),
+                          copyNimTree(writer.streamIdent),
                           newStrLitNode(writer.literalStringCache)))
         writer.literalStringCache = ""
 
 proc result*(writer : PStmtListWriter): PNimrodNode {.compileTime.} =
     writer.consumeCache()
     return writer.output
+
+proc streamName*(writer: PStmtListWriter):
+        PNimrodNode {.inline, compileTime.} =
+    writer.streamIdent
 
 proc addString*(writer : PStmtListWriter, val: string) {.compileTime.} =
     if writer.literalStringCache.len == 0:
@@ -52,4 +56,4 @@ proc addEscapedStringExpr*(writer: PStmtListWriter, val: PNimrodNode,
             escapeCall = newCall(newIdentNode("escapeHtml"), copyNimTree(val))
 
         writer.output.add(newCall(newIdentNode("write"),
-                          newIdentNode(streamVarName), escapeCall))
+                          copyNimTree(writer.streamIdent), escapeCall))
