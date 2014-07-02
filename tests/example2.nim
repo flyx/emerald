@@ -9,6 +9,7 @@ proc templ() {.html_template.} =
             title: "pageTitle"
             meta(http_equiv="content-type", content="text/html; charset=UTF-8")
         body:
+            const hurr = "durr"
             d.forTest:
                 for i in 1..10:
                     i
@@ -29,7 +30,7 @@ proc templ() {.html_template.} =
             p.caseTest:
                 case 1:
                 of 2: "hurr"
-                else: "durr"
+                else: hurr
             p.implicitIdTest("myId")
             block blockTest:
                 p.blockTest:

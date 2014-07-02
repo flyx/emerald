@@ -168,9 +168,9 @@ also converted.
 
 ### Variables
 
-You can declare variables using `var` everywhere. You can assign variables with
-a normal assignment statement everywhere. You can output variables by writing
-a statement containing only their name. Example:
+You can declare variables using `var`, `let`, `const` everywhere. You can assign
+variables with a normal assignment statement everywhere. You can output variables
+by writing a statement containing only their name. Example:
 
 ```nimrod
 var i = 10
@@ -180,6 +180,21 @@ while i > 5:
 ```
 
 If you're wondering how to call `inc(i, -1)`, see *Calling Nimrod proc* below.
+
+Assume no interaction between HTML tag blocks and variable scope. This will
+likely result in an error:
+
+```nimrod
+td:
+  var i = 1
+td:
+  var i = 10
+```
+
+Because it declares the variable `i` two times in the same scope. The `td`s
+do not inject a scope in the generated code - this would lead to a *lot* of
+nested blocks in the generated code. However, all Nimrod control structures
+(see above) do create a new variable scope in the template.
 
 ### HTML attributes
 

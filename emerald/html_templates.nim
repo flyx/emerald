@@ -133,7 +133,8 @@ proc processChilds(writer: PStmtListWriter,
         of nnkForStmt, nnkWhileStmt:
             writer.addNode(copyNodeParseChildren(writer, child,
                                                  context))
-        of nnkAsgn, nnkVarSection, nnkDiscardStmt:
+        of nnkAsgn, nnkVarSection, nnkConstSection, nnkLetSection,
+                nnkDiscardStmt:
             writer.addNode(copyNimTree(child))
         of nnkCommand:
             if child.len != 2:
