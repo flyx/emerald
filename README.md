@@ -92,8 +92,9 @@ a `PStream` as first argument**, and give values for the parameters
 *you* declared afterwards. The `PStream` parameter is injected automatically,
 and the `streams` package is imported automatically - do not import it again.
 
-The injected stream variable is named `ooooo`. I hope this name is ugly
-enough that no-one will accidentally use it for his or her own variables.
+As Emerald generates some declarations of variables and parameters, you have
+to treat *all* identifiers starting with `emerald` as reserved - do not use
+any identifiers starting with `emerald` inside your HTML templates.
 
 ### Hello, World
 

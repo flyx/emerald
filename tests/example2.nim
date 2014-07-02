@@ -31,6 +31,9 @@ proc templ() {.html_template.} =
                 of 2: "hurr"
                 else: "durr"
             p.implicitIdTest("myId")
+            block blockTest:
+                p.blockTest:
+                    "stuff in a block"
         when false:
             include foobar()
 

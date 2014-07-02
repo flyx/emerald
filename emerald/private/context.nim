@@ -1,4 +1,4 @@
-import sets, "../tagdef"
+import sets, "../tagdef", tables
 
 type
     TOutputMode* = enum
@@ -12,6 +12,7 @@ type
         permittedTags: set[TTagId]
 
     TContext = object
+        definedBlocks: TTable[string, PNimrodNode]
         tagList: PTagList
         level: int
         levelProps: seq[TContextLevel]
@@ -24,18 +25,19 @@ type
 
 template curLevel(): auto {.dirty.} = context.levelProps[context.level]
 
-proc tags*(context: PContext): PTagList {.inline, noSideEffect.} =
+proc tags*(context: PContext): PTagList {.inline, noSideEffect, compileTime.} =
     context.tagList
 
-proc mode*(context: PContext): TOutputMode {.inline, noSideEffect.} =
+proc mode*(context: PContext): TOutputMode {.inline, noSideEffect, compileTime.} =
     curLevel.outputMode
 
-proc `mode=`*(context: PContext, val: TOutputMode) {.inline.} =
+proc `mode=`*(context: PContext, val: TOutputMode) {.inline, compileTime.} =
     curLevel.outputMode = val
 
 proc newContext*(tags: PTagList, primaryTagId : TExtendedTagId,
-                 mode: TOutputMode = unknown): PContext =
+                 mode: TOutputMode = unknown): PContext {.compileTime.} =
     new(result)
+    result.definedBlocks = initTable[string, PNimrodNode]()
     result.tagList = tags
     result.level = 0
     result.levelProps = @[(
@@ -50,10 +52,10 @@ proc newContext*(tags: PTagList, primaryTagId : TExtendedTagId,
     else:
         result.levelProps[0].permittedTags.incl(TTagId(primaryTagId))
 
-proc depth*(context: PContext): int {.inline.} =
+proc depth*(context: PContext): int {.inline, compileTime.} =
     return context.level - 1
 
-proc enter*(context: PContext, tag: PTagDef) =
+proc enter*(context: PContext, tag: PTagDef) {.compileTime.} =
     # SIGSEGV! (probably a compiler bug; works at runtime, but not at compiletime)
     #forbiddenTags : context.forbiddenTags + tag.forbiddenTags
     context.levelProps.add((
@@ -74,12 +76,12 @@ proc enter*(context: PContext, tag: PTagDef) =
     for i in tag.forbiddenContent: 
         curLevel.forbiddenCategories.incl(i)
 
-proc exit*(context: PContext) =
+proc exit*(context: PContext) {.compileTime.} =
     assert context.level > 0
     discard context.levelProps.pop()
     inc(context.level, -1)
 
-proc accepts*(context: PContext, tag: PTagDef): bool =
+proc accepts*(context: PContext, tag: PTagDef): bool {.compileTime.} =
     result = false
     if curLevel.permittedContent.contains(any_content):
         return true
@@ -90,4 +92,13 @@ proc accepts*(context: PContext, tag: PTagDef): bool =
             return false
         if curLevel.permittedContent.contains(category):
             result = true
-    
+
+proc addBlock*(context: PContext, name: string, stmts: PNimrodNode) {.inline, compileTime.} =
+    context.definedBlocks[name] = stmts
+
+proc hasBlocks*(context: PContext): bool {.inline, compileTime.} =
+    return context.definedBlocks.len > 0
+
+iterator blocks*(context: PContext): tuple[key: string, val: PNimrodNode] {.inline.} =
+    for b in context.definedBlocks.pairs:
+        yield b

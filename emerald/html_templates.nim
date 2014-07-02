@@ -4,8 +4,6 @@ static:
 
 import streams, html5
 
-type PTemplateBlock = proc(emeraldOutput: PStream) not nil
-
 # interface
 
 proc html_template_impl(content: PNimrodNode, isTemplate: bool):
@@ -52,7 +50,10 @@ proc identName(node: PNimrodNode): string {.compileTime, inline.} =
     ## A prominent HTML tag is <div>, which is a keyword in Nimrod.
     ## You can either escape it with ``, or simply use "d" as a substitute.
     let name: string = if node.kind == nnkAccQuoted: $node[0] else: $node
-    return if name == "d": "div" else: name
+    result = if name == "d": "div" else: name
+    if result.toLower.startsWith("emerald"):
+        quit node.lineInfo &
+            ": Identifiers starting with 'emerald' are reserved."
 
 proc copyNodeParseChildren(writer: PStmtListWriter,
                            node: PNimrodNode, context: PContext):
@@ -151,6 +152,14 @@ proc processChilds(writer: PStmtListWriter,
             var call = copyNimTree(child[0])
             call.insert(1, newIdentNode(streamVarName))
             writer.addNode(call)
+        of nnkBlockStmt:
+            if child.len != 2 or (child[0].kind != nnkIdent and
+                                  child[0].kind != nnkAccQuoted):
+                quit child.lineInfo &
+                    ": Invalid block statement."
+            let blockName = child[0].identName
+            context.addBlock(blockName, child[1])
+            writer.addNode(newCall("emeraldBlock" & blockName))
         else:
             child.quitUnexpected("node type", child.kind)
 
@@ -279,14 +288,35 @@ proc processNode(writer: PStmtListWriter, context: PContext,
             writer.addString("</" & tagName & ">")
         if outputInBlockMode: writer.addString("\n")
 
+proc createBlockProc(context: PContext, name: string, stmts: PNimrodNode): PNimrodNode {.compileTime.} =
+    var
+        writer = newStmtListWriter()
+        lambdaStmt = newNimNode(nnkLambda, stmts)
+        formalParams = newNimNode(nnkFormalParams)
+    # just copying the tree as it appears when inspecting a written lambda.
+    # unsure if the empties are all necessary.
+    lambdaStmt.add(newNimNode(nnkEmpty))
+    lambdaStmt.add(newNimNode(nnkEmpty))
+    lambdaStmt.add(newNimNode(nnkEmpty))
+    formalParams.add(newNimNode(nnkEmpty))
+    lambdaStmt.add(formalParams)
+    lambdaStmt.add(newNimNode(nnkEmpty))
+    lambdaStmt.add(newNimNode(nnkEmpty))
+
+    processChilds(writer, stmts, context)
+    lambdaStmt.add(writer.result)
+
+    result = newNimNode(nnkIdentDefs)
+    result.add(newIdentNode("emeraldBlock" & name))
+    result.add(newNimNode(nnkEmpty))
+    result.add(lambdaStmt)
+
 proc html_template_impl(content: PNimrodNode, isTemplate: bool): PNimrodNode =
     ## parse the child tree of this node as HTML template. The macro
     ## transforms the template into Nimrod code. Currently,
     ## it is assumed that a variable "result" exists, and the generated
     ## code will append its output to this variable.
     assert content.kind == nnkProcDef
-
-    echo "parsing template \"" & identName(content[0]) & "\"..."
 
     result = newNimNode(nnkProcDef, content)
 
@@ -315,7 +345,14 @@ proc html_template_impl(content: PNimrodNode, isTemplate: bool): PNimrodNode =
             else:
                 primary = TExtendedTagId(context.tags["html"].id)
             processChilds(writer, child, context)
-            result.add(writer.result)
+            let stmts = writer.result
+            if context.hasBlocks:
+                var varSection = newNimNode(nnkVarSection)
+                for name, stmts in context.blocks:
+                    varSection.add(createBlockProc(context, name, stmts))
+                stmts.insert(0, varSection)
+            result.add(stmts)
+            
         of nnkEmpty, nnkPragma, nnkIdent:
             result.add(copyNimTree(child))
         else:

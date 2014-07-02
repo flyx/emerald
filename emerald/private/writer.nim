@@ -7,7 +7,7 @@ type
 
     PStmtListWriter* = ref TStmtListWriter not nil
 
-const streamVarName* = "ooooo"
+const streamVarName* = "emeraldStream"
 
 proc newStmtListWriter*(lineRef: PNimrodNode = nil):
         PStmtListWriter {.compileTime.} =
