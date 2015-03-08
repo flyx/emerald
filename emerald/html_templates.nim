@@ -258,10 +258,8 @@ proc processNode(writer: PStmtListWriter, context: PContext,
                 else:
                     parsedAttributes.incl("id")
                     processAttribute(writer, "id", child)
-            of nnkDo:
-                for doChild in child.children:
-                    if doChild.kind == nnkStmtList:
-                        nodeChildList = doChild
+            of nnkStmtList:
+              nodeChildList = child
             else:
                 child.quitUnexpected("token", child.kind)
 
