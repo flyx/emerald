@@ -269,7 +269,7 @@ proc html5tags*(): PTagList {.compileTime, tagdef.} =
     script:
         content_categories = (metadata_content, flow_content, phrasing_content)
         permitted_content  = text_content
-        optional_attrs     = (async, src, `type`, defer)
+        optional_attrs     = (async, src, `type`, `defer`)
     select:
         content_categories = (flow_content, phrasing_content, interactive_content)
         permitted_tags     = (option, optgroup)

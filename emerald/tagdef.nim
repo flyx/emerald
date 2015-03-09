@@ -48,7 +48,7 @@ iterator itemNames(node: PNimrodNode): string {.inline.} =
         for child in node.children:
             yield identName(child)
     else:
-        quit "Unexpected node kind: \"" & $node.kind & "\" (Expected identifier)"
+        raise newException(ValueError, "Unexpected node kind: \"" & $node.kind & "\" (Expected identifier)")
 
 proc parseCategory(node: PNimrodNode): TContentCategory {.compileTime.} =
     assert node.kind == nnkIdent
@@ -230,55 +230,46 @@ macro tagdef*(content: stmt): stmt {.immediate.} =
         tagCounter = low(TTagId)
     
     for child in content[stmtListIndex].children:
-        if child.kind != nnkCall:
-            quit "Unexpected token (expected call): " & $child.kind
-        if child[1].kind != nnkDo:
-            quit "Unexpected token (expected do): " & $child[1].kind
+        expectKind child, nnkCall
+        expectKind child[1], nnkStmtList
 
         var
             contentCategories, permittedContent, forbiddenContent : set[TContentCategory] = {}
             permittedTags, forbiddenTags : set[TTagId] = {}
             requiredAttrs, optionalAttrs : TSet[string] = initSet[string]()
             tagOmission: bool = false
-        for child1 in child[1].children:
-            case child1.kind:
-            of nnkEmpty, nnkFormalParams:
-                discard
-            of nnkStmtList:
-                for assign in child1.children:
-                    assert assign.kind == nnkAsgn
-                    case identName(assign[0]):
-                    of "content_categories":
-                        for category in assign[1].categories:
-                            contentCategories.incl(category)
-                    of "permitted_content":
-                        for category in assign[1].categories:
-                            permittedContent.incl(category)
-                    of "forbidden_content":
-                        for category in assign[1].categories:
-                            forbiddenContent.incl(category)
-                    of "permitted_tags":
-                        for tag in assign[1].itemNames:
-                            permittedTags.incl(definedTags.tagIdFor(tagCounter, tag))
-                    of "forbidden_tags":
-                        for tag in assign[1].itemNames:
-                            forbiddenTags.incl(definedTags.tagIdFor(tagCounter, tag))
-                    of "tag_omission":
-                        assert assign[1].kind == nnkIdent
-                        case $assign[1]:
-                        of "true": tagOmission = true
-                        of "false": tagOmission = false
-                        else: quit "Not a boolean value: " & $assign[1]
-                    of "required_attrs":
-                        for attr in assign[1].itemNames:
-                            requiredAttrs.incl(attr)
-                    of "optional_attrs":
-                        for attr in assign[1].itemNames:
-                            optionalAttrs.incl(attr)
-                    else:
-                        quit "Unknown key: " & identName(assign[0])
-            else:
-                quit "Unexpected node type: \"" & $child1.kind & "\""
+        for assign in child[1].children:
+          assert assign.kind == nnkAsgn
+          case identName(assign[0]):
+          of "content_categories":
+              for category in assign[1].categories:
+                  contentCategories.incl(category)
+          of "permitted_content":
+              for category in assign[1].categories:
+                  permittedContent.incl(category)
+          of "forbidden_content":
+              for category in assign[1].categories:
+                  forbiddenContent.incl(category)
+          of "permitted_tags":
+              for tag in assign[1].itemNames:
+                  permittedTags.incl(definedTags.tagIdFor(tagCounter, tag))
+          of "forbidden_tags":
+              for tag in assign[1].itemNames:
+                  forbiddenTags.incl(definedTags.tagIdFor(tagCounter, tag))
+          of "tag_omission":
+              assert assign[1].kind == nnkIdent
+              case $assign[1]:
+              of "true": tagOmission = true
+              of "false": tagOmission = false
+              else: quit "Not a boolean value: " & $assign[1]
+          of "required_attrs":
+              for attr in assign[1].itemNames:
+                  requiredAttrs.incl(attr)
+          of "optional_attrs":
+              for attr in assign[1].itemNames:
+                  optionalAttrs.incl(attr)
+          else:
+              raise newException(ValueError, "Unknown key: " & identName(assign[0]))
 
         for tag in child[0].itemNames:
             var
