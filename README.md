@@ -1,5 +1,16 @@
 # HTML 5 templating engine for Nimrod
 
+***Current status:***
+
+> I stopped working on emerald because of the various Nim (then Nimrod) VM
+> bugs I had to work around. Since they seem to be fixed now and interest
+> in emerald is growing (according to the star counter on GitHub), I plan to
+> rewrite the whole thing from ground up, adding some features that I could
+> not sensibly implement due to VM restraints back then. The main feature I
+> want to add is template inheritance. You can expect that this will lead to
+> some - hopefully minor - API changes. I am not sure how soon I find time
+> to do this, stay tuned.
+
 ## Overview
 
 Emerald is a macro-based type-safe templating engine for producing well-formed
