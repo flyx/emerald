@@ -1,6 +1,6 @@
-include ../src/emerald/filters
-include ../src/emerald/filters/impl
-import unittest
+import ../src/emerald/filters
+import ../src/emerald/filters/impl
+import unittest, streams
 
 suite "filtering tests":
     setup:

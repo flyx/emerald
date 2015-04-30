@@ -1,6 +1,10 @@
 import streams
 
-type StringOrChar = string or char
+type
+    StringOrChar* = string or char
+    Appendable* = concept x
+        x.append("string")
+        x.append('c')
 
 proc append*(stream: Stream, value: StringOrChar) {.inline.} = stream.write(value)
 
@@ -9,14 +13,11 @@ proc append*(stream: Stream, value: StringOrChar) {.inline.} = stream.write(valu
 # `var string`.
 proc append*(str: ptr string, value: StringOrChar) {.inline.} = str[].add(value)
 
-type Appendable* = concept x
-    x.append("string")
-
 proc escapeHtml*(target: Appendable, value : string, escapeQuotes: bool = false) =
     ## translates the characters `&`, `<` and `>` to their corresponding
     ## HTML entities. if `escapeQuotes` is `true`, also translates
     ## `"` and `'`.
-
+    
     for c in value:
         case c:
         of '&': target.append("&amp;")
@@ -30,3 +31,4 @@ proc escapeHtml*(target: Appendable, value : string, escapeQuotes: bool = false)
             else: target.append('\'')
         else:
             target.append(c)
+    
