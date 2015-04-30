@@ -10,6 +10,29 @@ static:
                 "lang", "spellcheck", "style", "tabindex", "title"])
 
 tag_list:
+    global:
+        attributes = (accesskey, contenteditable, contextmenu, dir, draggable,
+                      dropzone, hidden, id, itemid, itemprop, itemref,
+                      itemscope, itemtype, lang, spellcheck, style, tabindex,
+                      title,
+                      onabort, onautocomplete, onautocompleteerror, onblur,
+                      oncancel, oncanplay, oncanplaythrough, onchange, onclick,
+                      onclose, oncontextmenu, oncuechange, ondblclick, ondrag,
+                      ondragend, ondragenter, ondragexit, ondragleave,
+                      ondragover, ondragstart, ondrop, ondurationchange,
+                      onemptied, onended, onerror, onfocus, oninput, oninvalid,
+                      onkeydown, onkeypress, onkeyup, onload, onloadeddata,
+                      onloadedmetadata, onloadstart, onmousedown, onmouseenter,
+                      onmouseleave, onmousemove, onmouseout, onmouseover,
+                      onmouseup, onmousewheel, onpause, onplay, onplaying,
+                      onprogress, onratechange, onreset, onresize, onscroll,
+                      onseeked, onseeking, onselect, onshow, onsort, onstalled,
+                      onsubmit, onsuspend, ontimeupdate, ontoggle,
+                      onvolumechange, onwaiting)
+        booleans = (checked, compact, declare, `defer`, disabled, ismap,
+                    multiple, nohref, noresize, noshade, nowrap, readonly,
+                    selected)
+    
     a:
         content_categories = (flow_content, phrasing_content,
                               interactive_content)
@@ -145,6 +168,7 @@ tag_list:
         tag_omission       = true
     html:
         permitted_tags = (head, body)
+        required_attrs = lang
         optional_attrs = manifest
     iframe:
         content_categories = (flow_content, phrasing_content)

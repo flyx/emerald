@@ -83,6 +83,28 @@ proc add_filtered*(writer: StmtListWriter, val: NimNode) {.compileTime.} =
     writer.consume_cache()
     writer.add_filtered_node(val)
 
+proc add_attr_val*(writer: StmtListWriter, name: string,
+                   val: NimNode) {.compileTime.} =
+    writer.add_literal(' ' & name & "=\"")
+    writer.consume_cache()
+    writer.output.add(newCall("escape_html", writer.streamIdent, val,
+            ident("true")))
+    writer.add_literal("\"")
+
+proc add_attr_val*(writer: StmtListWriter, name: string,
+                   val: string) {.compileTime.} =
+    writer.add_literal(' ' & name & "=\"")
+    writer.consume_cache()
+    writer.output.add(newCall("escape_html", writer.streamIdent,
+            newStrLitNode(val), ident("true")))
+    writer.add_literal("\"")
+
+proc add_bool_attr*(writer: StmtListWriter, name: string,
+                    val: NimNode) {.compileTime.} =
+    writer.consume_cache()
+    writer.output.add(newIfStmt((val, newCall("write", writer.streamIdent,
+            newStrLitNode(' ' & name & "=\"" & name & "\"")))))
+
 proc add_node*(writer : StmtListWriter, val: NimNode) {.compileTime.} =
     writer.consume_cache()
     writer.output.add(val)

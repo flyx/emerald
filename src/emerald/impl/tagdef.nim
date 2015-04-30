@@ -99,20 +99,29 @@ macro tag_list*(content: stmt): stmt {.immediate.} =
                 newCall("hash", ident("name")), newNimNode(nnkInfix).add(
                 ident("+"), newCall("high",
                 ident("int32")), newIntLitNode(1))))
-        tagDefForCase = newNimNode(nnkCaseStmt).add(
-                ident("id"))
+        tagDefForCase = newNimNode(nnkCaseStmt).add(ident("id"))
+        isGlobalAttrCase = newNimNode(nnkCaseStmt).add(ident("name"))
+        isBoolAttrCase = newNimNode(nnkCaseStmt).add(ident("name"))
     
     # proc definitions
     let
         tagIdFor = newProc(newNimNode(nnkPostfix).add(
-                ident("*"), ident("tagIdFor")), [ident("ExtendedTagId"),
+                ident("*"), ident("tag_id_for")), [ident("ExtendedTagId"),
                 newIdentDefs(ident("name"), ident("string"))],
                 body=tagIdForCase)
         tagDefFor = newProc(newNimNode(nnkPostfix).add(
-                ident("*"), ident("tagDefFor")), [ident("TagDef"),
+                ident("*"), ident("tag_def_for")), [ident("TagDef"),
                 newIdentDefs(ident("id"), ident("TagId"))],
                 body=tagDefForCase)
-    result = newStmtList(tagIdFor, tagDefFor)
+        isGlobalAttr = newProc(newNimNode(nnkPostfix).add(
+                ident("*"), ident("is_global_attr")), [ident("bool"),
+                newIdentDefs(ident("name"), ident("string"))],
+                body=isGlobalAttrCase)
+        isBoolAttr = newProc(newNimNode(nnkPostfix).add(ident("*"),
+                ident("is_bool_attr")), [ident("bool"), newIdentDefs(
+                ident("name"), ident("string"))], body=newStmtList(
+                newAssignment(ident("result"), ident("false")), isBoolAttrCase))
+    result = newStmtList(tagIdFor, tagDefFor, isGlobalAttr, isBoolAttr)
     
     # process tag definitions
     for child in content.children:
@@ -125,6 +134,26 @@ macro tag_list*(content: stmt): stmt {.immediate.} =
             childrenList = newNimNode(nnkPar).add(child[0])
         else:
             quit("Invalid child: " & $child[0].kind)
+        
+        if child[0].kind == nnkIdent and $child[0].ident == "global":
+            for targetChild in child[1].children:
+                assert targetChild.kind == nnkAsgn
+                case targetChild[0].ident_name
+                of "attributes":
+                    assert targetChild[1].kind == nnkPar
+                    for attribute in targetChild[1].children:
+                        isGlobalAttrCase.add(newNimNode(nnkOfBranch).add(
+                                newStrLitNode($attribute.ident_name),
+                                newAssignment(ident("result"), ident("true"))))
+                of "booleans":
+                    assert targetChild[1].kind == nnkPar
+                    for attribute in targetChild[1].children:
+                        isBoolAttrCase.add(newNimNode(nnkOfBranch).add(
+                                newStrLitNode($attribute.ident_name),
+                                newAssignment(ident("result"), ident("true"))))
+                else:
+                    quit("Unknown field: " & $targetChild[0].ident_name)
+            continue
         
         for definedTag in childrenList.children:
             let
