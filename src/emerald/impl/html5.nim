@@ -9,9 +9,10 @@ static:
                 "itemprop", "itemref", "itemscope", "itemtype",
                 "lang", "spellcheck", "style", "tabindex", "title"])
 
-taglist:
+tag_list:
     a:
-        content_categories = (flow_content, phrasing_content, interactive_content)
+        content_categories = (flow_content, phrasing_content,
+                              interactive_content)
         permitted_content  = transparent
         optional_attrs     = (download, href, media, ping, rel, target,
                               hreflang, `type`)
@@ -33,7 +34,8 @@ taglist:
         permitted_content  = flow_content
         forbidden_tags     = main
     audio:
-        content_categories = (flow_content, embedded_content, interactive_content)
+        content_categories = (flow_content, embedded_content,
+                              interactive_content)
         permitted_content  = transparent
         permitted_tags     = (track, source)
     base:
@@ -54,7 +56,8 @@ taglist:
         content_categories = (flow_content, phrasing_content)
         tag_omission       = true
     button:
-        content_categories = (flow_content, phrasing_content, interactive_content)
+        content_categories = (flow_content, phrasing_content,
+                              interactive_content)
         permitted_content  = phrasing_content
         optional_attrs     = (autofocus, disabled, form, formaction,
                               formenctype, formmethod, formnovalidate,
@@ -264,7 +267,8 @@ taglist:
         permitted_content  = text_content
         optional_attrs     = (async, src, `type`, `defer`)
     select:
-        content_categories = (flow_content, phrasing_content, interactive_content)
+        content_categories = (flow_content, phrasing_content,
+                              interactive_content)
         permitted_tags     = (option, optgroup)
         optional_attrs     = (autofocus, disabled, form, multiple, name,
                               required, size)
@@ -290,7 +294,8 @@ taglist:
         content_categories = (metadata_content, flow_content, phrasing_content)
         permitted_content  = any_content
     textarea:
-        content_categories = (flow_content, phrasing_content, interactive_content)
+        content_categories = (flow_content, phrasing_content,
+                              interactive_content)
         permitted_content  = text_content
         optional_attrs     = (autocomplete, autofocus, cols, disabled, form,
                               maxlength, minlength, name, placeholder,
@@ -314,7 +319,8 @@ taglist:
         content_categories = flow_content
         permitted_tags     = (li, ol, ul)
     video:
-        content_categories = (flow_content, phrasing_content, embedded_content, interactive_content)
+        content_categories = (flow_content, phrasing_content, embedded_content,
+                              interactive_content)
         permitted_content  = transparent
         permitted_tags     = track
         forbidden_tags     = (audio, video)

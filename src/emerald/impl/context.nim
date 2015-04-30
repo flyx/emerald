@@ -22,7 +22,8 @@ type
 
 template curLevel(): auto {.dirty.} = context.levelProps[context.level]
 
-proc mode*(context: ParseContext): OutputMode {.inline, noSideEffect, compileTime.} =
+proc mode*(context: ParseContext): OutputMode {.inline, noSideEffect,
+                                                compileTime.} =
     curLevel.outputMode
 
 proc `mode=`*(context: ParseContext, val: OutputMode) {.inline, compileTime.} =
@@ -92,14 +93,16 @@ proc accepts*(context: ParseContext, tag: TagDef): bool {.compileTime.} =
             result = true
 
 proc indentation*(context: ParseContext): string {.compileTime} =
-     repeatChar(curLevel.indentLength, ' ')
+     repeat(' ', curLevel.indentLength)
 
-proc addBlock*(context: ParseContext, name: string, stmts: NimNode) {.inline, compileTime.} =
+proc addBlock*(context: ParseContext, name: string, stmts: NimNode) {.inline,
+            compileTime.} =
     context.definedBlocks[name] = stmts
 
 proc hasBlocks*(context: ParseContext): bool {.inline, compileTime.} =
     return context.definedBlocks.len > 0
 
-iterator blocks*(context: ParseContext): tuple[key: string, val: NimNode] {.inline.} =
+iterator blocks*(context: ParseContext):
+        tuple[key: string, val: NimNode] {.inline.} =
     for b in context.definedBlocks.pairs:
         yield b

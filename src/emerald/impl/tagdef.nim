@@ -26,18 +26,18 @@ type
 
 const unknownTag* = low(ExtendedTagId)
 
-proc identName(node: NimNode): string {.compileTime, inline.} =
+proc ident_name(node: NimNode): string {.compileTime, inline.} =
     case node.kind:
     of nnkAccQuoted:
         return $node[0]
     of nnkIdent:
         return $node
     of nnkPostfix:
-        return identName(node[1])
+        return ident_name(node[1])
     else:
         quit "Invalid token (expected identifier): " & $node.kind
 
-proc buildHashSet(name: string, content: NimNode): NimNode {.compileTime.} =
+proc build_hash_set(name: string, content: NimNode): NimNode {.compileTime.} =
     result = newNimNode(nnkExprColonExpr)
     result.add(newIdentNode(name))
     var
@@ -53,7 +53,7 @@ proc buildHashSet(name: string, content: NimNode): NimNode {.compileTime.} =
         call.add(content)
     result.add(call)
 
-proc getTagId(tags: var seq[tuple[name: string, def: bool]], name: string,
+proc id(tags: var seq[tuple[name: string, def: bool]], name: string,
               definition: bool = false): int {.compileTime.} =
     result = 1
     for tag in tags:
@@ -68,7 +68,7 @@ proc getTagId(tags: var seq[tuple[name: string, def: bool]], name: string,
             quit "Multiple definitions of tag \"" & name & "\"!"
         tags[result - 1].def = true
 
-macro taglist*(content: stmt): stmt {.immediate.} =
+macro tag_list*(content: stmt): stmt {.immediate.} =
     ## define a set of tags with this macro. Structure is:
     ##
     ## tagName:
@@ -128,9 +128,9 @@ macro taglist*(content: stmt): stmt {.immediate.} =
         
         for definedTag in childrenList.children:
             let
-                childName = identName(definedTag)
+                childName = ident_name(definedTag)
                 childHash = hash(childName) mod (high(int32) + 1)
-                tagId = tags.getTagId(childName, true)
+                tagId = tags.id(childName, true)
         
             block tagIdForProcessing:
                 var secondaryCase: NimNode = nil
@@ -146,20 +146,24 @@ macro taglist*(content: stmt): stmt {.immediate.} =
                     secondaryCase = newNimNode(nnkCaseStmt).add(ident("name"))
                     tagIdForCase.add(newNimNode(nnkOfBranch).add(newIntLitNode(
                             childHash), newStmtList(secondaryCase)))
-                secondaryCase.add(newNimNode(nnkOfBranch).add(newStrLitNode(childName),
-                    newStmtList(newNimNode(nnkReturnStmt).add(newIntLitNode(tagId)))))
+                secondaryCase.add(newNimNode(nnkOfBranch).add(
+                        newStrLitNode(childName), newStmtList(
+                        newNimNode(nnkReturnStmt).add(newIntLitNode(tagId)))))
         
             block tagDefForProcessing:
                 let sym = genSym(nskLet, ":" & childName)
                 var content = newNimNode(nnkObjConstr).add(ident("TagDef"))
-                content.add(newNimNode(nnkExprColonExpr).add(ident("id"), newIntLitNode(tagId)))
+                content.add(newNimNode(nnkExprColonExpr).add(ident("id"),
+                        newIntLitNode(tagId)))
                 
-                for categorySet in ["content_categories", "permitted_content", "forbidden_content"]:
+                for categorySet in ["content_categories", "permitted_content",
+                                    "forbidden_content"]:
                     var valueSet = newNimNode(nnkCurly)
                     for definedProp in child[1].children:
                         if definedProp.kind != nnkAsgn:
-                            quit("Invalid content in tag $#: $#" % [childName, $definedProp.kind])
-                        if $definedProp[0].identName == categorySet:
+                            quit("Invalid content in tag $#: $#" % [childName,
+                                    $definedProp.kind])
+                        if $definedProp[0].ident_name == categorySet:
                             case definedProp[1].kind:
                             of nnkIdent:
                                 valueSet.add(copyNimTree(definedProp[1]))
@@ -167,7 +171,9 @@ macro taglist*(content: stmt): stmt {.immediate.} =
                                 for name in definedProp[1].children:
                                     valueSet.add(copyNimTree(name))
                             else:
-                                quit("Invalid value for $# of $#: $#" % [categorySet, childName, $definedProp[1].kind])
+                                quit("Invalid value for $# of $#: $#" %
+                                        [categorySet, childName,
+                                        $definedProp[1].kind])
                             break
                     content.add(newNimNode(nnkExprColonExpr).add(
                             ident(categorySet), valueSet))
@@ -176,15 +182,21 @@ macro taglist*(content: stmt): stmt {.immediate.} =
                     var valueSet = newNimNode(nnkCurly)
                     for definedProp in child[1].children:
                         assert definedProp.kind == nnkAsgn
-                        if definedProp[0].identName == tagIdSet:
+                        if definedProp[0].ident_name == tagIdSet:
                             case definedProp[1].kind:
                             of nnkIdent:
-                                valueSet.add(newCall("TagId", newIntLitNode(tags.getTagId($definedProp[1].identName))))
+                                valueSet.add(newCall("TagId",
+                                        newIntLitNode(tags.id(
+                                        $definedProp[1].ident_name))))
                             of nnkPar:
                                 for name in definedProp[1].children:
-                                    valueSet.add(newCall("TagId", newIntLitNode(tags.getTagId($name.identName))))
+                                    valueSet.add(newCall("TagId",
+                                            newIntLitNode(tags.id(
+                                            $name.ident_name))))
                             else:
-                                quit("Invalid value for $# of $#: $#" % [tagIdSet, childName, $definedProp[1].kind])
+                                quit("Invalid value for $# of $#: $#" %
+                                        [tagIdSet, childName,
+                                        $definedProp[1].kind])
                             break
                     content.add(newNimNode(nnkExprColonExpr).add(
                             ident(tagIdSet), valueSet))
@@ -193,7 +205,7 @@ macro taglist*(content: stmt): stmt {.immediate.} =
                     var value: NimNode = nil
                     for definedProp in child[1].children:
                         assert definedProp.kind == nnkAsgn
-                        if $definedProp[0].identName == boolVal:
+                        if $definedProp[0].ident_name == boolVal:
                             value = copyNimTree(definedProp[1])
                             break
                     if value == nil:
@@ -205,30 +217,38 @@ macro taglist*(content: stmt): stmt {.immediate.} =
                     var valueSet = newNimNode(nnkBracket)
                     for definedProp in child[1].children:
                         assert definedProp.kind == nnkAsgn
-                        if $definedProp[0].identName == attrSet:
+                        if $definedProp[0].ident_name == attrSet:
                             case definedProp[1].kind:
                             of nnkIdent:
-                                valueSet.add(newStrLitNode($definedProp[1].identName))
+                                valueSet.add(newStrLitNode(
+                                        $definedProp[1].ident_name))
                             of nnkPar:
                                 for name in definedProp[1].children:
-                                    valueSet.add(newStrLitNode($name.identName))
+                                    valueSet.add(newStrLitNode(
+                                            $name.ident_name))
                             else:
-                                quit("Invalid value for $# of $#: $#" % [attrSet, childName, $definedProp[1].kind])
+                                quit("Invalid value for $# of $#: $#" %
+                                        [attrSet, childName,
+                                        $definedProp[1].kind])
                             break
-                    content.add(buildHashSet(attrSet, valueSet))
+                    content.add(build_hash_set(attrSet, valueSet))
                 
-                tagDefForCase.add(newNimNode(nnkOfBranch).add(newIntLitNode(tagId),
-                        newStmtList(newNimNode(nnkLetSection).add(newNimNode(nnkIdentDefs).add(
-                        sym, newEmptyNode(), content)), newNimNode(nnkReturnStmt).add(
-                        sym))))
+                tagDefForCase.add(newNimNode(nnkOfBranch).add(
+                        newIntLitNode(tagId), newStmtList(newNimNode(
+                        nnkLetSection).add(newNimNode(nnkIdentDefs).add(
+                        sym, newEmptyNode(), content)), newNimNode(
+                        nnkReturnStmt).add(sym))))
     
     # fill case blocks with else branches
     for targetChild in tagIdForCase.children:
         if targetChild.kind == nnkOfBranch:
             assert targetChild[1].kind == nnkStmtList
             assert targetChild[1][0].kind == nnkCaseStmt
-            targetChild[1][0].add(newNimNode(nnkElse).add(newNimNode(nnkReturnStmt).add(ident("unknownTag"))))
+            targetChild[1][0].add(newNimNode(nnkElse).add(
+                    newNimNode(nnkReturnStmt).add(ident("unknownTag"))))
             
-    tagIdForCase.add(newNimNode(nnkElse).add(newNimNode(nnkReturnStmt).add(ident("unknownTag"))))
-    tagDefForCase.add(newNimNode(nnkElse).add(newCall("quit", newStrLitNode("Should never happen"))))
+    tagIdForCase.add(newNimNode(nnkElse).add(newNimNode(nnkReturnStmt).add(
+            ident("unknownTag"))))
+    tagDefForCase.add(newNimNode(nnkElse).add(newCall("quit",
+            newStrLitNode("Should never happen"))))
     
