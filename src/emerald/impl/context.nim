@@ -12,6 +12,8 @@ type
         permittedTags: set[TagId]
         indentLength: int
         indentStep: int
+        compactOutput: bool
+        filters: seq[NimNode]
 
     ContextObj = object
         definedBlocks: Table[string, NimNode]
@@ -24,7 +26,7 @@ template curLevel(): auto {.dirty.} = context.levelProps[context.level]
 
 proc mode*(context: ParseContext): OutputMode {.inline, noSideEffect,
                                                 compileTime.} =
-    curLevel.outputMode
+    if curLevel.compactOutput: flowmode else: curLevel.outputMode
 
 proc `mode=`*(context: ParseContext, val: OutputMode) {.inline, compileTime.} =
     curLevel.outputMode = val
@@ -41,7 +43,9 @@ proc newContext*(primaryTagId : ExtendedTagId = unknownTag,
             permitted_content : set[ContentCategory]({}),
             permittedTags : set[TagId]({}),
             indentLength : 0,
-            indentStep : 4
+            indentStep : 4,
+            compactOutput: false,
+            filters: newSeq[NimNode]()
         )]
     if primaryTagId == low(TagId) - 1:
         result.levelProps[0].permitted_content.incl(any_content)
@@ -65,7 +69,9 @@ proc enter*(context: ParseContext, tag: TagDef) {.compileTime.} =
                 curLevel.permittedTags
                 else: tag.permittedTags,
             indentLength : curLevel.indentLength + curLevel.indentStep,
-            indentStep : curLevel.indentStep
+            indentStep : curLevel.indentStep,
+            compactOutput : curLevel.compactOutput,
+            filters : curLevel.filters
         ))
     inc(context.level)
 
@@ -92,8 +98,23 @@ proc accepts*(context: ParseContext, tag: TagDef): bool {.compileTime.} =
         if curLevel.permitted_content.contains(category):
             result = true
 
-proc indentation*(context: ParseContext): string {.compileTime} =
+proc indentation*(context: ParseContext): string {.compileTime.} =
      repeat(' ', curLevel.indentLength)
+
+proc `indent_step=`*(context: ParseContext, val: int) {.compileTime.} =
+    curLevel.indentStep = val
+
+proc compact_output*(context: ParseContext): bool {.compileTime.} =
+    context.compactOutput
+
+proc `compact_output=`*(context: ParseContext, val: bool) {.compileTime.} =
+    curLevel.compactOutput = val
+
+proc filters*(context: ParseContext): seq[NimNode] {.compileTime.} =
+    curLevel.filters
+
+proc `filters=`*(context: ParseContext, val: seq[NimNode]) {.compileTime.} =
+    curLevel.filters = val
 
 proc addBlock*(context: ParseContext, name: string, stmts: NimNode) {.inline,
             compileTime.} =

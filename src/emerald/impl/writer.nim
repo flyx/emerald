@@ -8,13 +8,14 @@ type
     StmtListWriterObj* = tuple
         streamIdent: NimNode
         output: NimNode
+        cache1, cache2: NimNode
         filteredStringCache: string
         literalStringCache: string
-        filters: seq[tuple[name: NimNode, params: NimNode]]
+        curFilters: seq[NimNode]
 
     StmtListWriter* = ref StmtListWriterObj not nil
 
-proc newStmtListWriter*(streamName: NimNode,
+proc newStmtListWriter*(streamName: NimNode, cache1: NimNode, cache2: NimNode,
                         lineRef: NimNode = nil):
                        StmtListWriter {.compileTime.} =
     new(result)
@@ -22,20 +23,25 @@ proc newStmtListWriter*(streamName: NimNode,
     result.output = newNimNode(nnkStmtList, lineRef)
     result.filteredStringCache = ""
     result.literalStringCache = ""
-    result.filters = newSeq[tuple[name: NimNode, params: NimNode]]()
+    result.cache1 = cache1
+    result.cache2 = cache2
+    result.curFilters = newSeq[NimNode]()
 
 proc add_filtered_node(writer: StmtListWriter, node: NimNode) {.compileTime.} =
-    if writer.filters.len > 0:
-        var i = writer.filters.len
-        while i > 0:
-            i = i - 1
-            var call = newCall(writer.filters[i].name)
-            call.add(if i == 0: writer.streamIdent else: ident(if i mod 2 == 0:
-                        ":cache1" else: ":cache2"))
-            call.add(if i == writer.filters.len - 1: node else:
-                    ident(if i mod 2 == 0: ":cache2" else: ":cache1"))
-            for param in writer.filters[i].params.children:
-                call.add(param)
+    if writer.curFilters.len > 0:
+        for i in 0 .. writer.curFilters.len - 1:
+            var call = newCall(writer.curFilters[i][0])
+            if i == writer.curFilters.len - 1:
+                call.add(writer.streamIdent)
+            else:
+                writer.output.add(newAssignment(if i mod 2 == 0: writer.cache1
+                        else: writer.cache2, newStrLitNode("")))
+                call.add(newCall("addr",
+                        if i mod 2 == 0: writer.cache1 else: writer.cache2))
+            call.add(if i == 0: node else: 
+                    if i mod 2 == 0: writer.cache2 else: writer.cache1)
+            for p in 1..writer.curFilters[i].len - 1:
+                call.add(writer.curFilters[i][p])
             writer.output.add(call)
     else:
         writer.output.add(newCall(newIdentNode("write"),
@@ -81,8 +87,7 @@ proc add_node*(writer : StmtListWriter, val: NimNode) {.compileTime.} =
     writer.consume_cache()
     writer.output.add(val)
 
-proc set_filters*(writer: StmtListWriter, filters: seq[tuple[name: NimNode,
-                 params: NimNode]]) {.compileTime.} =
+proc `filters=`*(writer: StmtListWriter, filters: seq[NimNode]) {.compileTime.}=
     if writer.filteredStringCache.len > 0:
         writer.consume_cache()
-    writer.filters = filters
+    writer.curFilters = filters
