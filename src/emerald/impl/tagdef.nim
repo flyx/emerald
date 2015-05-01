@@ -34,6 +34,8 @@ proc ident_name(node: NimNode): string {.compileTime, inline.} =
         return $node
     of nnkPostfix:
         return ident_name(node[1])
+    of nnkStrLit:
+        return node.strVal
     else:
         quit "Invalid token (expected identifier): " & $node.kind
 
@@ -84,9 +86,17 @@ macro tag_list*(content: stmt): stmt {.immediate.} =
     ## as TableRefs do not work well with the VM, this code constructs
     ## a number of procs instead:
     ##
-    ## proc tagIdFor*(name: string): TagId
+    ## proc tag_id_for*(name: string): TagId
     ##
-    ## proc tagDefFor*(id: TagId): TagDef
+    ## proc tag_def_for*(id: TagId): TagDef
+    ##
+    ## proc is_global_attr*(name: string): bool
+    ##
+    ## proc is_bool_attr*(name: string): bool
+    ##
+    ## proc string_to_prepend*(id: TagId): string
+    ##
+    ## iterator injected_attrs*(id: TagId): tuple[name: string, val: NimNode]
     
     assert content.kind == nnkStmtList
     assert content.len > 0
@@ -102,9 +112,11 @@ macro tag_list*(content: stmt): stmt {.immediate.} =
         tagDefForCase = newNimNode(nnkCaseStmt).add(ident("id"))
         isGlobalAttrCase = newNimNode(nnkCaseStmt).add(ident("name"))
         isBoolAttrCase = newNimNode(nnkCaseStmt).add(ident("name"))
+        stringToPrependCase = newNimNode(nnkCaseStmt).add(ident("id"))
+        injectedAttrsCase = newNimNode(nnkCaseStmt).add(ident("id"))
     
     # proc definitions
-    let
+    var
         tagIdFor = newProc(newNimNode(nnkPostfix).add(
                 ident("*"), ident("tag_id_for")), [ident("ExtendedTagId"),
                 newIdentDefs(ident("name"), ident("string"))],
@@ -116,12 +128,24 @@ macro tag_list*(content: stmt): stmt {.immediate.} =
         isGlobalAttr = newProc(newNimNode(nnkPostfix).add(
                 ident("*"), ident("is_global_attr")), [ident("bool"),
                 newIdentDefs(ident("name"), ident("string"))],
-                body=isGlobalAttrCase)
+                body=newStmtList())
         isBoolAttr = newProc(newNimNode(nnkPostfix).add(ident("*"),
                 ident("is_bool_attr")), [ident("bool"), newIdentDefs(
-                ident("name"), ident("string"))], body=newStmtList(
-                newAssignment(ident("result"), ident("false")), isBoolAttrCase))
-    result = newStmtList(tagIdFor, tagDefFor, isGlobalAttr, isBoolAttr)
+                ident("name"), ident("string"))], body=newStmtList())
+        stringToPrepend = newProc(newNimNode(nnkPostfix).add(ident("*"),
+                ident("string_to_prepend")), [ident("string"), newIdentDefs(
+                ident("id"), ident("TagId"))], body = newStmtList())
+        injectedAttrs = newProc(newNimNode(nnkPostfix).add(ident("*"),
+                ident("injected_attrs")), [newNimNode(nnkTupleTy).add(
+                newIdentDefs(ident("name"), ident("string")),
+                newIdentDefs(ident("val"), ident("NimNode"))),
+                newIdentDefs(ident("id"), ident("TagId"))], body = newStmtList(
+                ), procType = nnkIteratorDef)
+    result = newStmtList(tagIdFor, tagDefFor, isGlobalAttr, isBoolAttr,
+            stringToPrepend, injectedAttrs)
+    for procdef in result.children:
+        if procdef.kind == nnkProcDef:
+            procdef[4] = newNimNode(nnkPragma).add(ident("compileTime"))
     
     # process tag definitions
     for child in content.children:
@@ -136,6 +160,8 @@ macro tag_list*(content: stmt): stmt {.immediate.} =
             quit("Invalid child: " & $child[0].kind)
         
         if child[0].kind == nnkIdent and $child[0].ident == "global":
+            # process global tags, i.e. build is_global_attr and is_bool_attr
+            
             for targetChild in child[1].children:
                 assert targetChild.kind == nnkAsgn
                 case targetChild[0].ident_name
@@ -189,10 +215,8 @@ macro tag_list*(content: stmt): stmt {.immediate.} =
                                     "forbidden_content"]:
                     var valueSet = newNimNode(nnkCurly)
                     for definedProp in child[1].children:
-                        if definedProp.kind != nnkAsgn:
-                            quit("Invalid content in tag $#: $#" % [childName,
-                                    $definedProp.kind])
-                        if $definedProp[0].ident_name == categorySet:
+                        if definedProp.kind == nnkAsgn and
+                                $definedProp[0].ident_name == categorySet:
                             case definedProp[1].kind:
                             of nnkIdent:
                                 valueSet.add(copyNimTree(definedProp[1]))
@@ -210,8 +234,8 @@ macro tag_list*(content: stmt): stmt {.immediate.} =
                 for tagIdSet in ["permitted_tags", "forbidden_tags"]:
                     var valueSet = newNimNode(nnkCurly)
                     for definedProp in child[1].children:
-                        assert definedProp.kind == nnkAsgn
-                        if definedProp[0].ident_name == tagIdSet:
+                        if definedProp.kind == nnkAsgn and
+                                definedProp[0].ident_name == tagIdSet:
                             case definedProp[1].kind:
                             of nnkIdent:
                                 valueSet.add(newCall("TagId",
@@ -233,8 +257,8 @@ macro tag_list*(content: stmt): stmt {.immediate.} =
                 for boolVal in ["tag_omission"]:
                     var value: NimNode = nil
                     for definedProp in child[1].children:
-                        assert definedProp.kind == nnkAsgn
-                        if $definedProp[0].ident_name == boolVal:
+                        if definedProp.kind == nnkAsgn and
+                                $definedProp[0].ident_name == boolVal:
                             value = copyNimTree(definedProp[1])
                             break
                     if value == nil:
@@ -245,8 +269,8 @@ macro tag_list*(content: stmt): stmt {.immediate.} =
                 for attrSet in ["required_attrs", "optional_attrs"]:
                     var valueSet = newNimNode(nnkBracket)
                     for definedProp in child[1].children:
-                        assert definedProp.kind == nnkAsgn
-                        if $definedProp[0].ident_name == attrSet:
+                        if definedProp.kind == nnkAsgn and
+                                $definedProp[0].ident_name == attrSet:
                             case definedProp[1].kind:
                             of nnkIdent:
                                 valueSet.add(newStrLitNode(
@@ -267,6 +291,37 @@ macro tag_list*(content: stmt): stmt {.immediate.} =
                         nnkLetSection).add(newNimNode(nnkIdentDefs).add(
                         sym, newEmptyNode(), content)), newNimNode(
                         nnkReturnStmt).add(sym))))
+            
+            block processStringToPrepend:
+                for definedProp in child[1].children:
+                    if definedProp.kind == nnkAsgn and
+                            $definedProp[0].ident_name == "prepend":
+                        assert definedProp[1].kind == nnkStrLit
+                        stringToPrependCase.add(newNimNode(nnkOfBranch).add(
+                                newIntLitNode(tagId), newAssignment(
+                                ident("result"), definedProp[1])))
+            
+            block processInjectedAttrs:
+                for definedProp in child[1].children:
+                    if definedProp.kind == nnkCall and
+                            definedProp[0].ident_name == "injected_attrs":
+                        assert definedProp[1].kind == nnkStmtList
+                        var yields = newStmtList()
+                        for attrs in definedProp[1].children:
+                            assert attrs.kind == nnkAsgn
+                            let val = if attrs[1].kind == nnkStrLit:
+                                    newCall("newStrLitNode", attrs[1]) else:
+                                    newCall("ident",
+                                    newStrLitNode(attrs[1].ident_name))
+                            
+                            yields.add(newNimNode(nnkYieldStmt).add(
+                                    newNimNode(nnkPar).add(newNimNode(
+                                    nnkExprColonExpr).add(ident("name"),
+                                    newStrLitNode(attrs[0].ident_name)),
+                                    newNimNode(nnkExprColonExpr).add(ident(
+                                    "val"), val))))
+                        injectedAttrsCase.add(newNimNode(nnkOfBranch).add(
+                                newIntLitNode(tagId), yields))
     
     # fill case blocks with else branches
     for targetChild in tagIdForCase.children:
@@ -281,3 +336,25 @@ macro tag_list*(content: stmt): stmt {.immediate.} =
     tagDefForCase.add(newNimNode(nnkElse).add(newCall("quit",
             newStrLitNode("Should never happen"))))
     
+    for boolProcs in [(c: isGlobalAttrCase, p: isGlobalAttr),
+                      (c: isBoolAttrCase, p: isBoolAttr)]:
+        if boolProcs.c.len > 1:
+            boolProcs.c.add(newNimNode(nnkElse).add(newAssignment(
+                    ident("result"), ident("false"))))
+            boolProcs.p[6].add(boolProcs.c)
+        else:
+            boolProcs.p[6].add(ident("false"))
+    
+    if stringToPrependCase.len > 1:
+        stringToPrependCase.add(newNimNode(nnkElse).add(newAssignment(
+                ident("result"), newStrLitNode(""))))
+        stringToPrepend[6].add(stringToPrependCase)
+    else:
+        stringToPrepend[6].add(newStrLitNode(""))
+    
+    if injectedAttrsCase.len > 1:
+        injectedAttrsCase.add(newNimNode(nnkElse).add(newNimNode(
+                nnkDiscardStmt).add(newEmptyNode())))
+        injectedAttrs[6].add(injectedAttrsCase)
+    else:
+        injectedAttrs[6].add(newNimNode(nnkDiscardStmt).add(newEmptyNode()))

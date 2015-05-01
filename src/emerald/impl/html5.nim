@@ -1,4 +1,4 @@
-import tables, sets, hashes
+import tables, sets, hashes, macros
 import tagdef
 
 static:
@@ -170,6 +170,11 @@ tag_list:
         permitted_tags = (head, body)
         required_attrs = lang
         optional_attrs = manifest
+        prepend        = "<!DOCTYPE html>"
+        injected_attrs:
+            xmlns = "http://www.w3.org/1999/xhtml"
+            "xml:lang" = lang
+            
     iframe:
         content_categories = (flow_content, phrasing_content)
         optional_attrs     = (src, srcdoc, name, sandbox, seamless,

@@ -121,11 +121,28 @@ proc html_parse_tag(writer: StmtListWriter, context: ParseContext,
                     node: NimNode, tag: TagDef, name: string) {.compileTime.} =
     let outputInBlockMode = context.mode != flowmode
     
+    let toPrepend = string_to_prepend(tag.id)
+    if toPrepend.len > 0:
+        if outputInBlockMode:
+            writer.add_literal(context.indentation & toPrepend & "\n")
+        else:
+            writer.add_literal(toPrepend)
+    
     # HTML tag block
     if outputInBlockMode:
         writer.add_literal(context.indentation & "<" & name)
     else:
         writer.add_literal("<" & name)
+    
+    var mappedInjectedAttrs = initTable[string, string]()
+    for injectedAttr in injected_attrs(tag.id):
+        case injectedAttr.val.kind
+        of nnkStrLit:
+            writer.add_attr_val(injectedAttr.name, injectedAttr.val.strVal)
+        of nnkIdent:
+            mappedInjectedAttrs[$injectedAttr.val.ident] = injectedAttr.name
+        else:
+            quit "Error in tagdef!"
     
     var classes = ""
     if node[0].kind == nnkDotExpr:
@@ -171,6 +188,14 @@ proc html_parse_tag(writer: StmtListWriter, context: ParseContext,
             elif not is_global_attr(attrName):
                 quit_invalid(node[i][0], "attribute for tag " & name,
                         attrName)
+            
+            if mappedInjectedAttrs.hasKey(attrName):
+                if is_bool_attr(attrName):
+                    writer.add_bool_attr(mappedInjectedAttrs[attrName],
+                            node[i][1])
+                else:
+                    writer.add_attr_val(mappedInjectedAttrs[attrName],
+                            node[i][1])
         else:
             quit_unexpected(node[i], "token [2]", node[i].kind)
     if classes.len > 0:
