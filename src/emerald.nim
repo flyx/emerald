@@ -81,7 +81,7 @@ macro html_templ*(content: expr): stmt =
     stmts.add(writer.result)
     
     # debugging
-    #echo repr(result)
+    echo repr(result)
 
 proc ident_name(node: NimNode): string {.compileTime, inline.} =
     ## Used to be able to parse accent-quoted HTML tags as well.
@@ -258,6 +258,21 @@ proc add_filters(target: var seq[NimNode], node: NimNode,
     else:
         quit_unexpected(node, "token", node.kind)
 
+proc copy_node_parse_children(writer: StmtListWriter, context: ParseContext,
+                              node: NimNode): NimNode {.compileTime.} =
+    if node.kind in [nnkElifBranch, nnkOfBranch, nnkElse, nnkForStmt,
+                     nnkWhileStmt]:
+        result = copyNimNode(node)
+        var childWriter = writer.copy(node)
+        for child in node.children:
+            if child.kind == nnkStmtList:
+                html_parse_children(childWriter, context, child)
+            else:
+                result.add(copyNimTree(child))
+        result.add(childWriter.result)
+    else:
+        result = copyNimTree(node)
+
 proc html_parse_children(writer: StmtListWriter, context: ParseContext,
                          content: NimNode) =
     for node in content.children:
@@ -303,8 +318,37 @@ proc html_parse_children(writer: StmtListWriter, context: ParseContext,
                     
             
         of nnkStrLit, nnkTripleStrLit:
+            if context.mode == unknown:
+                context.mode = flowmode
             writer.add_filtered(node.strVal)
+        of nnkInfix:
+            if context.mode == unknown:
+                context.mode = flowmode
+            writer.add_filtered(node)
+        of nnkIdent:
+            if context.mode == unknown:
+                context.mode = flowmode
+            writer.add_filtered(newNimNode(nnkPrefix).add(ident("$"), node))
+        of nnkIfStmt, nnkWhenStmt, nnkCaseStmt:
+            var ifNode = newNimNode(node.kind, node)
+            for ifBranch in node.children:
+                ifNode.add(copy_node_parse_children(writer, context, ifBranch))
+            writer.add_node(ifNode)
+        of nnkForStmt, nnkWhileStmt:
+            writer.addNode(copy_node_parse_children(writer, context, node))
+        of nnkAsgn, nnkVarSection, nnkConstSection, nnkLetSection,
+                nnkDiscardStmt:
+            writer.addNode(copyNimTree(node))
+        of nnkCommand:
+            case identName(node[0]):
+            of "call":
+                for i in 1..(node.len - 1):
+                    writer.add_node(copyNimTree(node[1]))
+            of "put":
+                for i in 1..(node.len - 1):
+                    writer.add_filtered(copyNimTree(node[1]))
+            else:
+                quit_unknown(node, "command", node[0].ident_name)
         else:
             quit("not implemented!")
-    
     

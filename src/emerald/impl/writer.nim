@@ -27,6 +27,17 @@ proc newStmtListWriter*(streamName: NimNode, cache1: NimNode, cache2: NimNode,
     result.cache2 = cache2
     result.curFilters = newSeq[NimNode]()
 
+proc copy*(writer: StmtListWriter, lineRef: NimNode = nil):
+        StmtListWriter {.compileTime.} =
+    new(result)
+    result.streamIdent = writer.streamIdent
+    result.output = newNimNode(nnkStmtList, lineRef)
+    result.filteredStringCache = ""
+    result.literalStringCache = ""
+    result.cache1 = writer.cache1
+    result.cache2 = writer.cache2
+    result.curFilters = writer.curFilters
+
 proc add_filtered_node(writer: StmtListWriter, node: NimNode) {.compileTime.} =
     if writer.curFilters.len > 0:
         for i in 0 .. writer.curFilters.len - 1:
