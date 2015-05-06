@@ -1,69 +1,10 @@
-import macros, sets
-import streams, tables, strutils
+import macros, sets, streams, tables, strutils
 
 import impl/writer
 import impl/context
 import impl/html5
 import impl/tagdef
 import filters
-
-macro html_templ*(content: expr): stmt =
-    if content.kind != nnkProcDef:
-        quit_invalid(content, "html_templ subject",
-                    "html_templ only works on procs.")
-    let fp = content[3]
-
-    if fp[0].kind != nnkEmpty:
-        quit_invalid(content, "template proc", "proc must not return a value.")
-
-    # define a class type for the template object
-    let
-        className = genSym(nskType, ":class-" & $content[0].ident)
-        streamName = genSym(nskParam, ":stream")
-        objName = genSym(nskParam, ":obj")
-    result = newStmtList(newNimNode(nnkTypeSection).add(
-        newNimNode(nnkTypeDef).add(className, newEmptyNode(),
-        newNimNode(nnkRefTy).add(newNimNode(nnkObjectTy).add(newEmptyNode(),
-        newNimNode(nnkOfInherit).add(ident("RootObj")), newEmptyNode()
-    )))))
-    
-    # define render method
-    var 
-        formalParams = newNimNode(nnkFormalParams).add(newEmptyNode(),
-            newIdentDefs(objName, className),
-            newIdentDefs(streamName, ident("Stream"))
-        )
-        stmts: NimNode = newStmtList()
-    for identDef in content[3].children:
-        if identDef.kind != nnkEmpty:
-            formalParams.add(copyNimTree(identDef))
-    result.add(newNimNode(nnkProcDef).add(ident("render"),
-        newEmptyNode(), newEmptyNode(), formalParams, newEmptyNode(),
-        newEmptyNode(), stmts
-    ))
-    
-    # define template object
-    result.add(newNimNode(nnkLetSection).add(newIdentDefs(
-        ident($content[0].ident), newEmptyNode(), newCall(className)
-    )))
-
-    # parse template
-    # define two cache strings
-    let
-        cache1 = genSym(nskVar, ":cache1")
-        cache2 = genSym(nskVar, ":cache2")
-    var
-        writer = newStmtListWriter(streamName, cache1, cache2, content)
-        context = newContext()
-    context.filters = @[newCall("escapeHtml")]
-    writer.output.add(newNimNode(nnkVarSection).add(newNimNode(nnkIdentDefs
-            ).add(cache1, cache2, ident("string"), newEmptyNode())))
-    writer.filters = context.filters
-    parse_children(writer, context, content[6])
-    stmts.add(writer.result)
-    
-    # debugging
-    #echo repr(result)
 
 template quit_unknown[T](node: NimNode, what: string, val: T) =
     quit node.lineInfo & ": Unknown " & what & ": \"" & $val & "\""
@@ -89,6 +30,83 @@ proc ident_name(node: NimNode): string {.compileTime, inline.} =
     ## You can either escape it with ``, or simply use "d" as a substitute.
     let name: string = if node.kind == nnkAccQuoted: $node[0] else: $node
     result = if name == "d": "div" else: name
+
+# mixins are compiled each time they're used. This variable stores the
+# declarations of all mixins so that template processing can access them
+var mixins {.compileTime.} = newStmtList()
+
+proc write_proc_content(streamName: NimNode, srcProc: NimNode,
+                        context: ParseContext): NimNode {.compileTime.} =
+    let
+        cache1 = genSym(nskVar, ":cache1")
+        cache2 = genSym(nskVar, ":cache2")
+    var
+        writer = newStmtListWriter(streamName, cache1, cache2, srcProc)
+    context.filters = @[newCall("escapeHtml")]
+    writer.output.add(newNimNode(nnkVarSection).add(newNimNode(nnkIdentDefs
+            ).add(cache1, cache2, ident("string"), newEmptyNode())))
+    writer.filters = context.filters
+    parse_children(writer, context, srcProc[6])
+    return writer.result
+
+macro html_mixin*(content: expr): stmt =
+    if content.kind != nnkProcDef:
+        quit_invalid(content, "html_mixin subject", "expected a proc def.")
+    let fp = content[3]
+    
+    if fp[0].kind != nnkEmpty:
+        quit_invalid(content, "html_mixin proc", "proc must not return a value")
+    
+    mixins.add(content)
+    result = newEmptyNode()
+
+macro html_templ*(content: expr): stmt =
+    if content.kind != nnkProcDef:
+        quit_invalid(content, "html_templ subject", "expected a proc def.")
+    let fp = content[3]
+
+    if fp[0].kind != nnkEmpty:
+        quit_invalid(content, "template proc", "proc must not return a value.")
+
+    # define a class type for the template object
+    let
+        classIdent = genSym(nskType, ":class-" & content[0].ident_name)
+        className = if content[0].kind == nnkPostfix: newNimNode(nnkPostfix
+                ).add(ident("*"), classIdent) else: classIdent
+        streamName = genSym(nskParam, ":stream")
+        objName = genSym(nskParam, ":obj")
+    result = newStmtList(newNimNode(nnkTypeSection).add(
+        newNimNode(nnkTypeDef).add(className, newEmptyNode(),
+        newNimNode(nnkRefTy).add(newNimNode(nnkObjectTy).add(newEmptyNode(),
+        newNimNode(nnkOfInherit).add(ident("RootObj")), newEmptyNode()
+    )))))
+    
+    # define render method
+    var 
+        formalParams = newNimNode(nnkFormalParams).add(newEmptyNode(),
+            newIdentDefs(objName, className),
+            newIdentDefs(streamName, ident("Stream"))
+        )
+        stmts = write_proc_content(streamName, content, newContext(result))
+    for identDef in content[3].children:
+        if identDef.kind != nnkEmpty:
+            formalParams.add(copyNimTree(identDef))
+    let renderName = if content[0].kind == nnkPostfix: newNimNode(nnkPostfix
+            ).add(ident("*"), ident("render")) else: ident("render")
+    
+    # add render proc
+    result.add(newNimNode(nnkProcDef).add(renderName,
+        newEmptyNode(), newEmptyNode(), formalParams, newEmptyNode(),
+        newEmptyNode(), stmts
+    ))
+    
+    # define template object
+    result.add(newNimNode(nnkLetSection).add(newIdentDefs(
+        ident($content[0].ident), newEmptyNode(), newCall(className)
+    )))
+    
+    # debugging
+    echo treerepr(result)
 
 proc first_ident(node: NimNode): string {.compileTime.} =
     var leaf = node
@@ -340,13 +358,64 @@ proc parse_children(writer: StmtListWriter, context: ParseContext,
                 nnkDiscardStmt:
             writer.addNode(copyNimTree(node))
         of nnkCommand:
-            case identName(node[0]):
+            case node[0].ident_name
             of "call":
                 for i in 1..(node.len - 1):
                     writer.add_node(copyNimTree(node[1]))
             of "put":
                 for i in 1..(node.len - 1):
                     writer.add_filtered(copyNimTree(node[1]))
+            of "call_mixin":
+                # if we just directly paste the parsed mixin code here, all
+                # symbols that are visible here are visible in the mixin. we
+                # don't want to have that. therefore, we instanciate a new proc
+                # that pastes the content of the mixin.
+                
+                if node[1].kind != nnkCall:
+                    quit_unexpected(node[1], "token (expected call)", node.kind)
+                
+                let name = node[1][0].ident_name
+                var procdef : NimNode = nil
+                for child in mixins.children:
+                    assert child.kind == nnkProcDef
+                    if child[0].ident_name == name:
+                        procdef = child
+                        break
+                
+                if procdef == nil:
+                    quit_unknown(node[1][0], "mixin", name)
+                
+                # use the mixin's pragma value as instance counter
+                var index = 0
+                if procdef[4].kind == nnkEmpty or procdef[4].len == 0:
+                    procdef[4] = newNimNode(nnkPragma).add(newIntLitNode(0))
+                else:
+                    echo treerepr(procdef[4])
+                    index = int(procdef[4][0].intVal)
+                
+                let
+                    mixinSym = genSym(nskProc, ":" & name & $index)
+                    mixinStream = genSym(nskParam, ":stream")
+                
+                var
+                    mixinStmts = write_proc_content(mixinStream, procdef,
+                        context)
+                    instance = newProc(mixinSym, [newEmptyNode(),
+                        newIdentDefs(mixinStream, ident("Stream"))], mixinStmts)
+                
+                for i in 1 .. procdef[3].len - 1:
+                    instance[3].add(procdef[3][i])
+                
+                echo treerepr(procdef)
+                
+                #writer.add_node(newBlockStmt(newEmptyNode(), mixinStmts))
+                context.global_stmt_list.add(instance)
+                
+                var mixinCall = newCall(mixinSym, writer.streamName)
+                for i in 1 .. node[1].len - 1:
+                    mixinCall.add(node[1][i])
+                writer.add_node(mixinCall)
+                
             else:
                 quit_unknown(node, "command", node[0].ident_name)
         else:

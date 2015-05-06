@@ -16,6 +16,7 @@ type
         filters: seq[NimNode]
 
     ContextObj = object
+        globalStmtList: NimNode
         definedBlocks: Table[string, NimNode]
         level: int
         levelProps: seq[ContextLevel]        
@@ -31,9 +32,11 @@ proc mode*(context: ParseContext): OutputMode {.inline, noSideEffect,
 proc `mode=`*(context: ParseContext, val: OutputMode) {.inline, compileTime.} =
     curLevel.outputMode = val
 
-proc newContext*(primaryTagId : ExtendedTagId = unknownTag,
+proc newContext*(globalStmtList: NimNode,
+                 primaryTagId : ExtendedTagId = unknownTag,
                  mode: OutputMode = unknown): ParseContext {.compileTime.} =
     new(result)
+    result.globalStmtList = globalStmtList
     result.definedBlocks = initTable[string, NimNode]()
     result.level = 0
     result.levelProps = @[ContextLevel(
@@ -115,6 +118,9 @@ proc filters*(context: ParseContext): seq[NimNode] {.compileTime.} =
 
 proc `filters=`*(context: ParseContext, val: seq[NimNode]) {.compileTime.} =
     curLevel.filters = val
+
+proc global_stmt_list*(context: ParseContext): NimNode {.compileTime.} =
+    context.globalStmtList
 
 proc addBlock*(context: ParseContext, name: string, stmts: NimNode) {.inline,
             compileTime.} =
