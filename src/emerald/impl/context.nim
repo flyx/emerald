@@ -1,8 +1,19 @@
-import sets, tagdef, tables, strutils
+import sets, tagdef, tables, strutils, macros
+import writer
 
 type
     OutputMode* = enum
         unknown, blockmode, flowmode
+    
+    ParseContext* = ref ContextObj not nil
+    
+    MixinLevelObj = object
+        callbackContent: NimNode
+        callable: bool
+        callbackWriter: StmtListWriter
+        callContentSyms: seq[tuple[varSym: NimNode, paramSym: NimNode]]
+    
+    MixinLevel* = ref MixinLevelObj not nil
 
     ContextLevel = object
         outputMode: OutputMode
@@ -17,11 +28,10 @@ type
 
     ContextObj = object
         globalStmtList: NimNode
-        definedBlocks: Table[string, NimNode]
         level: int
-        levelProps: seq[ContextLevel]        
-
-    ParseContext* = ref ContextObj not nil
+        levelProps: seq[ContextLevel]
+        mixinLevels: seq[MixinLevel]
+    
 
 template curLevel(): auto {.dirty.} = context.levelProps[context.level]
 
@@ -32,13 +42,50 @@ proc mode*(context: ParseContext): OutputMode {.inline, noSideEffect,
 proc `mode=`*(context: ParseContext, val: OutputMode) {.inline, compileTime.} =
     curLevel.outputMode = val
 
+proc newMixinLevel*(callbackContent: NimNode): MixinLevel {.compileTime.} =
+    new(result)
+    result.callbackContent = callbackContent
+    result.callable = false
+
+proc newMixinLevel*(callbackContent: NimNode, writer: StmtListWriter):
+        MixinLevel {.compileTime.} =
+    new(result)
+    result.callbackContent = callbackContent
+    result.callable = true
+    result.callbackWriter = writer
+    result.callContentSyms = newSeq[tuple[varSym: NimNode, paramSym: NimNode]]()
+
+proc callback_content*(ml: MixinLevel): NimNode {.compileTime.} =
+    ml.callbackContent
+
+proc add_call*(ml: MixinLevel):
+        tuple[varSym: NimNode, paramSym: NimNode] {.compileTime.} =
+    result = (varSym : genSym(nskVar, ":m" & $(ml.callContentSyms.len)),
+            paramSym: genSym(nskParam, ":content" &
+            $(ml.callContentSyms.len)))
+    ml.callContentSyms.add(result)
+
+iterator call_content_syms*(ml: MixinLevel):
+        tuple[varSym: NimNode, paramSym: NimNode] =
+    for sym in ml.callContentSyms:
+        yield sym
+
+proc writer*(ml: MixinLevel): StmtListWriter {.compileTime.} = ml.callbackWriter
+
+proc calls_content*(ml: MixinLevel): NimNode {.compileTime.} =
+    ml.callbackWriter.result
+
+proc num_calls*(ml: MixinLevel): int {.compileTime.} = ml.callContentSyms.len 
+
+proc callable*(ml: MixinLevel): bool = ml.callable
+
 proc newContext*(globalStmtList: NimNode,
                  primaryTagId : ExtendedTagId = unknownTag,
                  mode: OutputMode = unknown): ParseContext {.compileTime.} =
     new(result)
     result.globalStmtList = globalStmtList
-    result.definedBlocks = initTable[string, NimNode]()
     result.level = 0
+    result.mixinLevels = newSeq[MixinLevel]()
     result.levelProps = @[ContextLevel(
             outputMode : mode,
             forbiddenCategories : set[ContentCategory]({}),
@@ -54,6 +101,13 @@ proc newContext*(globalStmtList: NimNode,
         result.levelProps[0].permitted_content.incl(any_content)
     else:
         result.levelProps[0].permittedTags.incl(TagId(primaryTagId))
+
+proc copy*(context: ParseContext): ParseContext {.compileTime.} =
+    new(result)
+    result.globalStmtList = copyNimTree(context.globalStmtList)
+    result.level = context.level
+    result.mixinLevels = context.mixinLevels
+    result.levelProps = context.levelProps
 
 proc depth*(context: ParseContext): int {.inline, compileTime.} =
     return context.level - 1
@@ -122,14 +176,11 @@ proc `filters=`*(context: ParseContext, val: seq[NimNode]) {.compileTime.} =
 proc global_stmt_list*(context: ParseContext): NimNode {.compileTime.} =
     context.globalStmtList
 
-proc addBlock*(context: ParseContext, name: string, stmts: NimNode) {.inline,
-            compileTime.} =
-    context.definedBlocks[name] = stmts
+proc push_mixin_level*(context: ParseContext, lev: MixinLevel) {.compileTime.} =
+    context.mixinLevels.add(lev)
 
-proc hasBlocks*(context: ParseContext): bool {.inline, compileTime.} =
-    return context.definedBlocks.len > 0
+proc mixin_level*(context: ParseContext): MixinLevel {.compileTime.} =
+    context.mixinLevels[context.mixinLevels.len - 1]
 
-iterator blocks*(context: ParseContext):
-        tuple[key: string, val: NimNode] {.inline.} =
-    for b in context.definedBlocks.pairs:
-        yield b
+proc pop_mixin_level*(context: ParseContext): MixinLevel {.compileTime.} =
+    context.mixinLevels.pop()

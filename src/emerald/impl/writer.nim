@@ -43,7 +43,7 @@ proc add_filtered_node(writer: StmtListWriter, node: NimNode) {.compileTime.} =
         for i in 0 .. writer.curFilters.len - 1:
             var call = newCall(writer.curFilters[i][0])
             if i == writer.curFilters.len - 1:
-                call.add(writer.streamIdent)
+                call.add(copyNimTree(writer.streamIdent))
             else:
                 writer.output.add(newAssignment(if i mod 2 == 0: writer.cache1
                         else: writer.cache2, newStrLitNode("")))
@@ -55,18 +55,21 @@ proc add_filtered_node(writer: StmtListWriter, node: NimNode) {.compileTime.} =
                 call.add(writer.curFilters[i][p])
             writer.output.add(call)
     else:
-        writer.output.add(newCall(newIdentNode("write"),
-                          copyNimTree(writer.streamIdent),
-                          node))
+        writer.output.add(newCall(ident("write"), writer.streamIdent, node))
 
 proc consume_cache(writer : StmtListWriter) {.compileTime.} =
     if writer.filteredStringCache.len > 0:
-        writer.addFilteredNode(newStrLitNode(writer.filteredStringCache))
+        writer.add_filtered_node(newStrLitNode(writer.filteredStringCache))
         writer.filteredStringCache = ""
     if writer.literalStringCache.len > 0:
         writer.output.add(newCall(ident("write"), writer.streamIdent,
                 newStrLitNode(writer.literalStringCache)))
         writer.literalStringCache = ""
+
+proc set_stream_ident*(writer: StmtListWriter,
+                       streamIdent: NimNode) {.compileTime.} =
+    writer.consume_cache()
+    writer.streamIdent = streamIdent
 
 proc result*(writer : StmtListWriter): NimNode {.compileTime.} =
     ## Get the current result AST. This proc has the side effect of finalizing
@@ -93,6 +96,11 @@ proc add_literal*(writer: StmtListWriter, val: string) {.compileTime.} =
 proc add_filtered*(writer: StmtListWriter, val: NimNode) {.compileTime.} =
     writer.consume_cache()
     writer.add_filtered_node(val)
+
+proc add_literal*(writer: StmtListWriter, val: NimNode) {.compileTime.} =
+    writer.consume_cache()
+    writer.output.add(newCall(ident("write"), writer.streamIdent,
+            val))
 
 proc add_attr_val*(writer: StmtListWriter, name: string,
                    val: NimNode) {.compileTime.} =
