@@ -372,18 +372,23 @@ proc parse_children(writer: StmtListWriter, context: ParseContext,
                             quit_invalid(node[i][0], "mixin content",
                                     "not available")
                         
-                        let (sym, callbackSym) = mixinLevel.add_call()
+                        let
+                            (cache1, cache2) = mixinLevel.callback_caches()
+                            callbackSym = genSym(nskParam, ":content" &
+                                    $(mixinLevel.num_calls()))
+                        var
+                            mixinWriter = newStmtListWriter(genSym(nskParam,
+                                    ":m" & $(mixinLevel.num_calls())),
+                                    cache1, cache2)
                         
-                        mixinLevel.writer.set_stream_ident(sym)
-                        mixinLevel.writer.addNode(newNimNode(nnkVarSection).add(
-                                newIdentDefs(sym, newEmptyNode(), newCall(
-                                ident("newStringStream")))))
-                
-                        parse_children(mixinLevel.writer, context,
+                        parse_children(mixinWriter, context,
                                 mixinLevel.callback_content)
                         
+                        mixinLevel.add_call(mixinWriter.result, callbackSym,
+                                mixinWriter.target_stream())
                         
-                        writer.add_literal(callbackSym)
+                        writer.add_node(newCall(callbackSym,
+                                writer.target_stream()))
                     else:
                         writer.add_filtered(copyNimTree(node[i]))
             of "call_mixin":
@@ -417,11 +422,12 @@ proc parse_children(writer: StmtListWriter, context: ParseContext,
                 let
                     mixinSym = genSym(nskProc, ":" & name & $index)
                     mixinStream = genSym(nskParam, ":stream")
+                    (cache1, cache2) = writer.cache_vars()
                 
                 var
                     mixinLevel = if node.len > 2 and
                         node[2].kind == nnkStmtList: newMixinLevel(node[2],
-                                writer.copy()) else: newMixinLevel(node[2])
+                                cache1, cache2) else: newMixinLevel(node[2])
                 
                 context.push_mixin_level(mixinLevel)
                 
@@ -437,7 +443,10 @@ proc parse_children(writer: StmtListWriter, context: ParseContext,
                     instance[3].add(procdef[3][i])
                 
                 for s in mixinLevel.call_content_syms:
-                    instance[3].add(newIdentDefs(s.paramSym, ident("string")))
+                    instance[3].add(newIdentDefs(s.procSym, newNimNode(
+                            nnkProcTy).add(newNimNode(nnkFormalParams).add(
+                            newEmptyNode(), newIdentDefs(s.streamSym,
+                            ident("Stream"))), newEmptyNode())))
                 
                 context.global_stmt_list.add(instance)
                 
@@ -446,15 +455,13 @@ proc parse_children(writer: StmtListWriter, context: ParseContext,
                     mixinCall.add(node[1][i])
                 
                 for s in mixinLevel.call_content_syms:
-                    mixinCall.add(newNimNode(nnkDotExpr).add(s.varSym,
-                            ident("data")))
+                    mixinCall.add(newNimNode(nnkLambda).add(newEmptyNode(),
+                            newEmptyNode(), newEmptyNode(), newNimNode(
+                            nnkFormalParams).add(newEmptyNode(), newIdentDefs(
+                            s.streamSym, ident("Stream"))), newEmptyNode(),
+                            newEmptyNode(), s.content))
                 
-                var
-                    mixinBlock = newNimNode(nnkBlockStmt).add(newEmptyNode())
-                    blockContent = mixinLevel.calls_content()
-                blockContent.add(mixinCall)
-                mixinBlock.add(blockContent)
-                writer.add_node(mixinBlock)
+                writer.add_node(mixinCall)
             else:
                 quit_unknown(node, "command", node[0].ident_name)
         else:

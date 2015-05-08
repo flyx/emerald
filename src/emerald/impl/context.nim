@@ -10,8 +10,9 @@ type
     MixinLevelObj = object
         callbackContent: NimNode
         callable: bool
-        callbackWriter: StmtListWriter
-        callContentSyms: seq[tuple[varSym: NimNode, paramSym: NimNode]]
+        callbackCache1, callbackCache2: NimNode
+        callContent: seq[tuple[content: NimNode, procSym: NimNode,
+                               streamSym: NimNode]]
     
     MixinLevel* = ref MixinLevelObj not nil
 
@@ -47,37 +48,37 @@ proc newMixinLevel*(callbackContent: NimNode): MixinLevel {.compileTime.} =
     result.callbackContent = callbackContent
     result.callable = false
 
-proc newMixinLevel*(callbackContent: NimNode, writer: StmtListWriter):
+proc newMixinLevel*(callbackContent: NimNode, callbackCache1: NimNode,
+                    callbackCache2: NimNode):
         MixinLevel {.compileTime.} =
     new(result)
     result.callbackContent = callbackContent
     result.callable = true
-    result.callbackWriter = writer
-    result.callContentSyms = newSeq[tuple[varSym: NimNode, paramSym: NimNode]]()
+    result.callbackCache1 = callbackCache1
+    result.callbackCache2 = callbackCache2
+    result.callContent = newSeq[tuple[content: NimNode, procSym: NimNode,
+                                      streamSym: NimNode]]()
 
 proc callback_content*(ml: MixinLevel): NimNode {.compileTime.} =
     ml.callbackContent
 
-proc add_call*(ml: MixinLevel):
-        tuple[varSym: NimNode, paramSym: NimNode] {.compileTime.} =
-    result = (varSym : genSym(nskVar, ":m" & $(ml.callContentSyms.len)),
-            paramSym: genSym(nskParam, ":content" &
-            $(ml.callContentSyms.len)))
-    ml.callContentSyms.add(result)
+proc add_call*(ml: MixinLevel, content: NimNode, procSym: NimNode,
+               streamSym: NimNode) {.compileTime.} =
+    ml.callContent.add((content: content, procSym: procSym,
+                        streamSym: streamSym))
 
 iterator call_content_syms*(ml: MixinLevel):
-        tuple[varSym: NimNode, paramSym: NimNode] =
-    for sym in ml.callContentSyms:
+        tuple[content: NimNode, procSym: NimNode, streamSym: NimNode] =
+    for sym in ml.callContent:
         yield sym
 
-proc writer*(ml: MixinLevel): StmtListWriter {.compileTime.} = ml.callbackWriter
-
-proc calls_content*(ml: MixinLevel): NimNode {.compileTime.} =
-    ml.callbackWriter.result
-
-proc num_calls*(ml: MixinLevel): int {.compileTime.} = ml.callContentSyms.len 
+proc num_calls*(ml: MixinLevel): int {.compileTime.} = ml.callContent.len 
 
 proc callable*(ml: MixinLevel): bool = ml.callable
+
+proc callback_caches*(ml: MixinLevel):
+        tuple[cache1: NimNode, cache2: NimNode] {.compileTime.} =
+    (cache1: ml.callbackCache1, cache2: ml.callbackCache2)
 
 proc newContext*(globalStmtList: NimNode,
                  primaryTagId : ExtendedTagId = unknownTag,

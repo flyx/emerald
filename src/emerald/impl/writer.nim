@@ -72,6 +72,13 @@ proc set_stream_ident*(writer: StmtListWriter,
     writer.consume_cache()
     writer.streamIdent = streamIdent
 
+proc target_stream*(writer: StmtListWriter): NimNode {.compileTime.} =
+    writer.streamIdent
+
+proc cache_vars*(writer: StmtListWriter):
+        tuple[cache1: NimNode, cache2: NimNode] {.compileTime.} =
+        (writer.cache1, writer.cache2)
+
 proc result*(writer : StmtListWriter): NimNode {.compileTime.} =
     ## Get the current result AST. This proc has the side effect of finalizing
     ## the current literal string cache.
