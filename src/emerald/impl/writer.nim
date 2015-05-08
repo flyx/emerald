@@ -45,12 +45,13 @@ proc add_filtered_node(writer: StmtListWriter, node: NimNode) {.compileTime.} =
             if i == writer.curFilters.len - 1:
                 call.add(copyNimTree(writer.streamIdent))
             else:
-                writer.output.add(newAssignment(if i mod 2 == 0: writer.cache1
-                        else: writer.cache2, newStrLitNode("")))
-                call.add(newCall("addr",
-                        if i mod 2 == 0: writer.cache1 else: writer.cache2))
-            call.add(if i == 0: node else: 
-                    if i mod 2 == 0: writer.cache2 else: writer.cache1)
+                writer.output.add(newAssignment(newNimNode(nnkDotExpr).add(
+                        if i mod 2 == 0: writer.cache1 else: writer.cache2,
+                        ident("data")), newStrLitNode("")))
+                call.add(if i mod 2 == 0: writer.cache1 else: writer.cache2)
+            call.add(if i == 0: node else: newNimNode(nnkDotExpr).add(
+                    if i mod 2 == 0: writer.cache2 else: writer.cache1,
+                    ident("data")))
             for p in 1..writer.curFilters[i].len - 1:
                 call.add(writer.curFilters[i][p])
             writer.output.add(call)

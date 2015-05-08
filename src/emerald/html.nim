@@ -43,8 +43,9 @@ proc write_proc_content(streamName: NimNode, srcProc: NimNode,
     var
         writer = newStmtListWriter(streamName, cache1, cache2, srcProc)
     context.filters = @[newCall("escapeHtml")]
-    writer.output.add(newNimNode(nnkVarSection).add(newNimNode(nnkIdentDefs
-            ).add(cache1, cache2, ident("string"), newEmptyNode())))
+    writer.output.add(newNimNode(nnkVarSection).add(newIdentDefs(
+            cache1, newEmptyNode(), newCall("newStringStream")),
+            newIdentDefs(cache2, newEmptyNode(), newCall("newStringStream"))))
     writer.filters = context.filters
     parse_children(writer, context, srcProc[6])
     return writer.result
