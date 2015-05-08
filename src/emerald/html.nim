@@ -84,11 +84,12 @@ macro html_templ*(content: expr): stmt =
     
     # define render method
     var 
+        context = newContext(result)
         formalParams = newNimNode(nnkFormalParams).add(newEmptyNode(),
             newIdentDefs(objName, className),
             newIdentDefs(streamName, ident("Stream"))
         )
-        stmts = write_proc_content(streamName, content, newContext(result))
+        stmts = write_proc_content(streamName, content, context)
     for identDef in content[3].children:
         if identDef.kind != nnkEmpty:
             formalParams.add(copyNimTree(identDef))
@@ -106,8 +107,8 @@ macro html_templ*(content: expr): stmt =
         ident($content[0].ident), newEmptyNode(), newCall(className)
     )))
     
-    # debugging
-    echo treerepr(result)
+    if context.debug:
+        echo repr(result)
 
 proc first_ident(node: NimNode): string {.compileTime.} =
     var leaf = node
@@ -329,6 +330,8 @@ proc parse_children(writer: StmtListWriter, context: ParseContext,
                     writer.filters = context.filters &
                             newCall("change_indentation",
                             newStrLitNode(context.indentation))
+                of "debug":
+                    context.debug = bool_from_ident(node[0][1])
                 else:
                     quit_unknown(node[0][0], "configuration value name",
                             $node[0][0].ident)
@@ -466,4 +469,3 @@ proc parse_children(writer: StmtListWriter, context: ParseContext,
                 quit_unknown(node, "command", node[0].ident_name)
         else:
             quit_unexpected(node, "token", node.kind)
-    

@@ -28,6 +28,7 @@ type
         filters: seq[NimNode]
 
     ContextObj = object
+        debugOutput: bool
         globalStmtList: NimNode
         level: int
         levelProps: seq[ContextLevel]
@@ -84,6 +85,7 @@ proc newContext*(globalStmtList: NimNode,
                  primaryTagId : ExtendedTagId = unknownTag,
                  mode: OutputMode = unknown): ParseContext {.compileTime.} =
     new(result)
+    result.debugOutput = false
     result.globalStmtList = globalStmtList
     result.level = 0
     result.mixinLevels = newSeq[MixinLevel]()
@@ -185,3 +187,8 @@ proc mixin_level*(context: ParseContext): MixinLevel {.compileTime.} =
 
 proc pop_mixin_level*(context: ParseContext): MixinLevel {.compileTime.} =
     context.mixinLevels.pop()
+
+proc debug*(context: ParseContext): bool {.compileTime.} = context.debugOutput
+
+proc `debug=`*(context: ParseContext, val: bool) {.compileTime.} =
+    context.debugOutput = val
