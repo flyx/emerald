@@ -46,9 +46,17 @@ proc add_filtered_node(writer: StmtListWriter, node: NimNode) {.compileTime.} =
             if i == writer.curFilters.len - 1:
                 call.add(copyNimTree(writer.streamIdent))
             else:
-                writer.output.add(newAssignment(newNimNode(nnkDotExpr).add(
-                        if i mod 2 == 0: writer.cache1 else: writer.cache2,
-                        ident("data")), newStrLitNode("")))
+                #writer.output.add(newAssignment(newNimNode(nnkDotExpr).add(
+                #        if i mod 2 == 0: writer.cache1 else: writer.cache2,
+                #        ident("data")), newStrLitNode("")))
+                #writer.output.add(newCall(newNimNode(nnkDotExpr).add(
+                #        if i mod 2 == 0: writer.cache1 else: writer.cache2,
+                #        ident("setPosition")),  newIntLitNode(0)))
+                # TODO: try to avoid allocating memory here.
+                #       commented code above does not work.
+                writer.output.add(newAssignment(if i mod 2 == 0:
+                        writer.cache1 else: writer.cache2, newCall(
+                        "newStringStream")))
                 call.add(if i mod 2 == 0: writer.cache1 else: writer.cache2)
             call.add(if i == 0: node else: newNimNode(nnkDotExpr).add(
                     if i mod 2 == 0: writer.cache2 else: writer.cache1,
