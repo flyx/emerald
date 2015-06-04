@@ -33,22 +33,175 @@ proc ident_name(node: NimNode): string {.compileTime, inline.} =
 
 # mixins are compiled each time they're used. This variable stores the
 # declarations of all mixins so that template processing can access them
-var mixins {.compileTime.} = newStmtList()
+var
+    mixins {.compileTime.} = newStmtList()
+    templateClasses {.compileTime.} = newSeq[TemplateClass]()
 
-proc write_proc_content(streamName: NimNode, srcProc: NimNode,
+proc update_template_class(val: TemplateClass) {.compileTime.} =
+    ## the VM tends to copy objects that are passed as references. This proc
+    ## is a workaround for that: after a template class is changed, it makes
+    ## sure that the object contained in `templateClasses` is up-to-date with
+    ## the given copy.
+    for class in templateClasses:
+        if class.name == val.name:
+            for meth in val.methods:
+                var found = false
+                for existing_meth in class.methods:
+                    if existing_meth.name == meth.name:
+                        found = true
+                        break
+                if not found:
+                    class.add_method(meth.name, meth.sym, meth.context)
+            break
+
+proc write_proc_content(streamName: NimNode, content: NimNode,
                         context: ParseContext): NimNode {.compileTime.} =
     let
         cache1 = genSym(nskVar, ":cache1")
         cache2 = genSym(nskVar, ":cache2")
     var
-        writer = newStmtListWriter(streamName, cache1, cache2, srcProc)
+        writer = newStmtListWriter(streamName, cache1, cache2, content)
     context.filters = @[newCall("escapeHtml")]
     writer.output.add(newNimNode(nnkVarSection).add(newIdentDefs(
             cache1, newEmptyNode(), newCall("newStringStream")),
             newIdentDefs(cache2, newEmptyNode(), newCall("newStringStream"))))
     writer.filters = context.filters
-    parse_children(writer, context, srcProc[6])
+    parse_children(writer, context, content)
     return writer.result
+
+proc bool_from_ident(node: NimNode): bool {.compileTime.} =
+    case $node.ident
+    of "true": result = true
+    of "false": result = false
+    else:
+        quit_invalid(node, "bool value", $node.ident)
+
+proc int_from_lit(node: NimNode): int {.compileTime.} =
+    if node.kind != nnkIntLit:
+        quit_unexpected(node, "node kind (expected int literal)", $node.kind)
+    result = int(node.intVal)
+
+proc add_filters(target: var seq[NimNode], node: NimNode,
+                 context: ParseContext) {.compileTime.} =
+    case node.kind
+    of nnkInfix:
+        if node[0].kind != nnkIdent:
+            quit_unexpected(node[0], "token", node[0].kind)
+        elif $node[0].ident != "&":
+            quit_unexpected(node[0], "operator", node[0].ident)
+        add_filters(target, node[1], context)
+        add_filters(target, node[2], context)
+    of nnkIdent:
+        case $node.ident
+        of "filters":
+            target.add(context.filters)
+        else:
+            quit_unexpected(node, "identifier", $node.ident)
+    of nnkCall:
+        target.add(node)
+    else:
+        quit_unexpected(node, "token", node.kind)
+
+proc process_pragma(writer: OptionalStmtListWriter, node: NimNode,
+                    context: ParseContext) {.compileTime.} =
+    case node.kind
+    of nnkExprEqExpr:
+        case $node[0].ident
+        of "compact_mode":
+            context.compact_output = bool_from_ident(node[1])
+        of "indent_step":
+            let length = int_from_lit(node[1])
+            if length < 0:
+                quit_invalid(node[1], "indentation length", length)
+            context.indent_step = length
+        of "filters":
+            if writer != nil:
+                var result = newSeq[NimNode]()
+                add_filters(result, node[1], context)
+                context.filters = result
+                writer.filters = context.filters &
+                        newCall("change_indentation",
+                        newStrLitNode(context.indentation))
+            else:
+                quit_invalid(node, "`filters` pragma",
+                        "not allowed on root level of inheriting template")
+        of "debug":
+            context.debug = bool_from_ident(node[1])
+        else:
+            quit_unknown(node[0], "configuration value name",
+                    $node[0].ident)
+    else:
+        quit_invalid(node, "pragma content", $node.kind)
+
+proc process_block_replacements(content: NimNode,
+        context: ParseContext) {.compileTime.} =
+    for node in content.children:
+        case node.kind
+        of nnkPragma:
+            process_pragma(nil, node[0], context)
+        of nnkCommand:
+            case node[0].ident_name
+            of "replace", "append", "prepend":
+                if node[1].kind != nnkIdent:
+                    quit_unexpected(node[1], "token (expected ident)",
+                            node[1].kind)
+                if node.len < 2:
+                    quit_missing(node, "body")
+                if node[2].kind != nnkStmtList:
+                    quit_unexpected(node[2], "token (expected stmt list)",
+                            node[2].kind)
+                if not context.at_root:
+                    quit_invalid(node, "block replacement command",
+                            "may only be used at root level")
+                let class = context.cur_class
+                if class == nil:
+                    quit_invalid(node, "block replacement command",
+                            "may not be used in mixins")
+                if class.parent == nil:
+                    quit_invalid(node, "block replacement command",
+                            "may only be used in inheriting templates")
+                
+                let
+                    (className, objName) = context.global_syms()
+                    blockName = node[1].ident_name
+            
+                # search for the method we override
+                var
+                    curClass = class.parent
+                    methodName: NimNode = nil
+                    methodContext: OptionalParseContext = nil
+                block outerLoop:
+                    while curClass != nil:
+                        for m in curClass.methods:
+                            if m.name == blockName:
+                                methodName = genSym(nskMethod, $m.sym)
+                                methodContext = m.context
+                                break outerLoop
+                        curClass = curClass.parent
+                if methodContext == nil:
+                    quit_unknown(node[1], "block name", blockName)
+                else:
+                    var targetCotext: ParseContext = methodContext.copy()
+            
+                    targetCotext.adapt_to_child_class(context)
+            
+                    let
+                        streamName = genSym(nskParam, ":stream")
+                        meth = newProc(methodName, [newEmptyNode(),
+                                newIdentDefs(objName, className),
+                                newIdentDefs(streamName, ident("Stream"))],
+                                write_proc_content(streamName, node[2],
+                                methodContext), nnkMethodDef)
+            
+                    class.add_method(blockName, methodName, methodContext)
+                    context.global_stmt_list.add(meth)
+            else:
+                quit_unexpected(node,
+                        "command (expected replace, prepend or append)",
+                        node[0].ident_name)
+        else:
+            quit_unexpected(node, "token (expected block replacement command)",
+                    node.kind)
 
 macro html_mixin*(content: expr): stmt =
     if content.kind != nnkProcDef:
@@ -61,7 +214,23 @@ macro html_mixin*(content: expr): stmt =
     mixins.add(content)
     result = newEmptyNode()
 
-macro html_templ*(content: expr): stmt =
+macro html_templ*(arg1: expr, arg2: expr = nil): stmt =
+    let
+        parent = if arg2.kind != nnkNilLit: arg1 else: nil
+        content = if arg2.kind == nnkNilLit: arg1 else: arg2
+    
+    var parentClass: TemplateClass = nil
+    if parent != nil:
+        if parent.kind != nnkCall:
+            quit_unexpected(parent, "html_templ parameter (expected call)",
+                    parent.kind)
+        for class in templateClasses:
+            if class.name == ":class-" & $(parent[0].ident_name):
+                parentClass = class
+                break
+        if parentClass == nil:
+            quit_unknown(parent, "parent template", $(parent[0].ident_name))
+
     if content.kind != nnkProcDef:
         quit_invalid(content, "html_templ subject", "expected a proc def.")
     let fp = content[3]
@@ -79,28 +248,41 @@ macro html_templ*(content: expr): stmt =
     result = newStmtList(newNimNode(nnkTypeSection).add(
         newNimNode(nnkTypeDef).add(className, newEmptyNode(),
         newNimNode(nnkRefTy).add(newNimNode(nnkObjectTy).add(newEmptyNode(),
-        newNimNode(nnkOfInherit).add(ident("RootObj")), newEmptyNode()
+        newNimNode(nnkOfInherit).add(if parent == nil: ident("RootObj") else:
+        parentClass.symbol), newEmptyNode()
     )))))
     
     # define render method
     var 
-        context = newContext(result)
+        templClass = newTemplateClass(className, parentClass)
+        context = newContext(result, templClass, objName)
         formalParams = newNimNode(nnkFormalParams).add(newEmptyNode(),
             newIdentDefs(objName, className),
             newIdentDefs(streamName, ident("Stream"))
         )
-        stmts = write_proc_content(streamName, content, context)
+    templateClasses.add(templClass)
     for identDef in content[3].children:
         if identDef.kind != nnkEmpty:
             formalParams.add(copyNimTree(identDef))
     let renderName = if content[0].kind == nnkPostfix: newNimNode(nnkPostfix
             ).add(ident("*"), ident("render")) else: ident("render")
     
+    var stmts: NimNode
+    if parentClass == nil:
+        stmts = write_proc_content(streamName, content[6], context)
+    else:
+        stmts = newCall(newNimNode(nnkDotExpr).add(newCall(parentClass.symbol,
+                objName), ident("render")),
+                streamName)
+        for i in 1 .. (parent.len - 1):
+            stmts.add(parent[i])
+        process_block_replacements(content[6], context)
+    
     # add render proc
     result.add(newNimNode(nnkProcDef).add(renderName,
         newEmptyNode(), newEmptyNode(), formalParams, newEmptyNode(),
         newEmptyNode(), stmts
-    ))
+    ))  
     
     # define template object
     result.add(newNimNode(nnkLetSection).add(newIdentDefs(
@@ -109,6 +291,11 @@ macro html_templ*(content: expr): stmt =
     
     if context.debug:
         echo repr(result)
+        echo "====CLASSES===="
+        for templ in templateClasses:
+            echo templ.name
+            for m in templ.methods:
+                echo "  " & m.name
 
 proc first_ident(node: NimNode): string {.compileTime.} =
     var leaf = node
@@ -245,39 +432,6 @@ proc parse_tag(writer: StmtListWriter, context: ParseContext,
     if outputInBlockMode:
         writer.add_literal("\n")
 
-proc bool_from_ident(node: NimNode): bool {.compileTime.} =
-    case $node.ident
-    of "true": result = true
-    of "false": result = false
-    else:
-        quit_invalid(node, "bool value", $node.ident)
-
-proc int_from_lit(node: NimNode): int {.compileTime.} =
-    if node.kind != nnkIntLit:
-        quit_unexpected(node, "node kind (expected int literal)", $node.kind)
-    result = int(node.intVal)
-
-proc add_filters(target: var seq[NimNode], node: NimNode,
-                 context: ParseContext) {.compileTime.} =
-    case node.kind
-    of nnkInfix:
-        if node[0].kind != nnkIdent:
-            quit_unexpected(node[0], "token", node[0].kind)
-        elif $node[0].ident != "&":
-            quit_unexpected(node[0], "operator", node[0].ident)
-        add_filters(target, node[1], context)
-        add_filters(target, node[2], context)
-    of nnkIdent:
-        case $node.ident
-        of "filters":
-            target.add(context.filters)
-        else:
-            quit_unexpected(node, "identifier", $node.ident)
-    of nnkCall:
-        target.add(node)
-    else:
-        quit_unexpected(node, "token", node.kind)
-
 proc copy_node_parse_children(writer: StmtListWriter, context: ParseContext,
                               node: NimNode): NimNode {.compileTime.} =
     if node.kind in [nnkElifBranch, nnkOfBranch, nnkElse, nnkForStmt,
@@ -313,31 +467,7 @@ proc parse_children(writer: StmtListWriter, context: ParseContext,
             else:
                 quit_invalid(node, "Tag at this position", childName)
         of nnkPragma:
-            case node[0].kind
-            of nnkExprEqExpr:
-                case $node[0][0].ident
-                of "compact_mode":
-                    context.compact_output = bool_from_ident(node[0][1])
-                of "indent_step":
-                    let length = int_from_lit(node[0][1])
-                    if length < 0:
-                        quit_invalid(node[0][1], "indentation length", length)
-                    context.indent_step = length
-                of "filters":
-                    var result = newSeq[NimNode]()
-                    add_filters(result, node[0][1], context)
-                    context.filters = result
-                    writer.filters = context.filters &
-                            newCall("change_indentation",
-                            newStrLitNode(context.indentation))
-                of "debug":
-                    context.debug = bool_from_ident(node[0][1])
-                else:
-                    quit_unknown(node[0][0], "configuration value name",
-                            $node[0][0].ident)
-            else:
-                quit_invalid(node[0], "pragma content", $node[0].kind)
-            
+            process_pragma(writer, node[0], context)
         of nnkStrLit, nnkTripleStrLit:
             if context.mode == unknown:
                 context.mode = flowmode
@@ -360,6 +490,44 @@ proc parse_children(writer: StmtListWriter, context: ParseContext,
         of nnkAsgn, nnkVarSection, nnkConstSection, nnkLetSection,
                 nnkDiscardStmt:
             writer.addNode(copyNimTree(node))
+        of nnkBlockStmt:
+            if node[0].kind == nnkEmpty:
+                quit_missing(node[0], "block name")
+            let templ = context.cur_class()
+            if templ == nil:
+                quit_invalid(node, "block", "no blocks allowed in mixins")
+            
+            let
+                (className, objName) = context.global_syms()
+                blockName = node[0].ident_name
+            
+            # check if we're overriding an existing method
+            var curClass = templ
+            while curClass != nil:
+                for m in curClass.methods:
+                    if m.name == blockName:
+                        quit_duplicate(node, "block", blockName)
+                curClass = curClass.parent
+            
+            let
+                methodName = genSym(nskMethod, ":block-" & templ.name() & "-" &
+                        blockName)
+                streamName = genSym(nskParam, ":stream")
+                meth = newProc(methodName, [newEmptyNode(),
+                        newIdentDefs(objName, className),
+                        newIdentDefs(streamName, ident("Stream"))],
+                        write_proc_content(streamName, node[1], context),
+                        nnkMethodDef)
+            
+            templ.add_method(blockName, methodName, context)
+            # references currently not properly handled by VM.
+            # templ is a copy, therefore, copy it back.
+            context.cur_class = templ
+            update_template_class(templ)
+            
+            context.global_stmt_list.add(meth)
+            writer.add_node(newCall(methodName, objName, writer.target_stream))
+            
         of nnkCommand:
             case node[0].ident_name
             of "call":
@@ -401,7 +569,8 @@ proc parse_children(writer: StmtListWriter, context: ParseContext,
                 # that pastes the content of the mixin.
                 
                 if node[1].kind != nnkCall:
-                    quit_unexpected(node[1], "token (expected call)", node.kind)
+                    quit_unexpected(node[1], "token (expected call)",
+                            node[1].kind)
                 
                 let name = node[1][0].ident_name
                 var procdef : NimNode = nil
@@ -435,7 +604,7 @@ proc parse_children(writer: StmtListWriter, context: ParseContext,
                 context.push_mixin_level(mixinLevel)
                 
                 var
-                    mixinStmts = write_proc_content(mixinStream, procdef,
+                    mixinStmts = write_proc_content(mixinStream, procdef[6],
                         context)
                     instance = newProc(mixinSym, [newEmptyNode(),
                         newIdentDefs(mixinStream, ident("Stream"))], mixinStmts)

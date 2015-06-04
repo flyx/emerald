@@ -2,10 +2,17 @@ import sets, tagdef, tables, strutils, macros
 import writer
 
 type
+    TemplateClass* = ref TemplateClassObj
+    TemplateClassObj {.acyclic.} = object
+        sym: NimNode
+        parentClass: TemplateClass
+        meths: seq[tuple[name: string, sym: NimNode, context: ParseContext]]
+
     OutputMode* = enum
         unknown, blockmode, flowmode
     
     ParseContext* = ref ContextObj not nil
+    OptionalParseContext* = ref ContextObj
     
     MixinLevelObj = object
         callbackContent: NimNode
@@ -28,21 +35,52 @@ type
         filters: seq[NimNode]
 
     ContextObj = object
+        class: TemplateClass
+        objName: NimNode
         debugOutput: bool
         globalStmtList: NimNode
         level: int
         levelProps: seq[ContextLevel]
         mixinLevels: seq[MixinLevel]
-    
 
-template curLevel(): auto {.dirty.} = context.levelProps[context.level]
+proc copy*(context: ParseContext): ParseContext {.compileTime.}
+
+proc `mode=`*(context: ParseContext, val: OutputMode) {.inline, compileTime.}
+
+proc newTemplateClass*(sym: NimNode, parent: TemplateClass = nil):
+        TemplateClass =
+    new(result)
+    result.sym = sym
+    result.parentClass = parent
+    result.meths = newSeq[tuple[name: string, sym: NimNode,
+                                context: ParseContext]]()
+
+proc add_method*(class: TemplateClass, name: string, sym: NimNode,
+                 context: ParseContext) {.compileTime.} =
+    var copiedContext = context.copy()
+    copiedContext.mode = unknown
+    class.meths.add((name: name, sym: sym, context: copiedContext))
+
+iterator methods*(class: TemplateClass): 
+        tuple[name: string, sym: NimNode, context: ParseContext] =
+    for m in class.meths:
+        yield m
+
+proc name*(class: TemplateClass): string {.compileTime.} = $class.sym
+
+proc parent*(class: TemplateClass): TemplateClass {.compileTime.} =
+    class.parentClass
+
+proc symbol*(class: TemplateClass): NimNode {.compileTime.} = class.sym
+
+template cur_level(): auto {.dirty.} = context.levelProps[context.level]
 
 proc mode*(context: ParseContext): OutputMode {.inline, noSideEffect,
                                                 compileTime.} =
-    if curLevel.compactOutput: flowmode else: curLevel.outputMode
+    if cur_level.compactOutput: flowmode else: cur_level.outputMode
 
-proc `mode=`*(context: ParseContext, val: OutputMode) {.inline, compileTime.} =
-    curLevel.outputMode = val
+proc `mode=`*(context: ParseContext, val: OutputMode) =
+    cur_level.outputMode = val
 
 proc newMixinLevel*(callbackContent: NimNode): MixinLevel {.compileTime.} =
     new(result)
@@ -82,9 +120,13 @@ proc callback_caches*(ml: MixinLevel):
     (cache1: ml.callbackCache1, cache2: ml.callbackCache2)
 
 proc newContext*(globalStmtList: NimNode,
+                 class: TemplateClass,
+                 objName: NimNode = newEmptyNode(),
                  primaryTagId : ExtendedTagId = unknownTag,
                  mode: OutputMode = unknown): ParseContext {.compileTime.} =
     new(result)
+    result.class = class
+    result.objName = objName
     result.debugOutput = false
     result.globalStmtList = globalStmtList
     result.level = 0
@@ -105,12 +147,24 @@ proc newContext*(globalStmtList: NimNode,
     else:
         result.levelProps[0].permittedTags.incl(TagId(primaryTagId))
 
-proc copy*(context: ParseContext): ParseContext {.compileTime.} =
+proc copy*(context: ParseContext): ParseContext =
     new(result)
+    result.class = context.class
+    result.objName = context.objName
+    result.debugOutput = context.debugOutput
     result.globalStmtList = copyNimTree(context.globalStmtList)
     result.level = context.level
-    result.mixinLevels = context.mixinLevels
-    result.levelProps = context.levelProps
+    result.mixinLevels = newSeq[MixinLevel]()
+    for ml in context.mixinLevels:
+        result.mixinLevels.add(ml)
+    result.levelProps = newSeq[ContextLevel]()
+    for lp in context.levelProps:
+        result.levelProps.add(lp)
+
+proc adapt_to_child_class*(context: ParseContext,
+        childContext: ParseContext) {.compileTime.} =
+    context.class = childContext.class
+    context.globalStmtList = childContext.globalStmtList
 
 proc depth*(context: ParseContext): int {.inline, compileTime.} =
     return context.level - 1
@@ -120,25 +174,25 @@ proc enter*(context: ParseContext, tag: TagDef) {.compileTime.} =
     #forbiddenTags : context.forbiddenTags + tag.forbiddenTags
     context.levelProps.add(ContextLevel(
             outputMode : if context.mode == flowmode: flowmode else: unknown,
-            forbiddenCategories : curLevel.forbiddenCategories,
-            forbiddenTags : curLevel.forbiddenTags,
+            forbiddenCategories : cur_level.forbiddenCategories,
+            forbiddenTags : cur_level.forbiddenTags,
             permittedContent: if tag.permittedContent.contains(transparent):
                 curLevel.permitted_content
                 else: tag.permitted_content,
             permittedTags : if tag.permitted_content.contains(transparent):
                 curLevel.permittedTags
                 else: tag.permittedTags,
-            indentLength : curLevel.indentLength + curLevel.indentStep,
-            indentStep : curLevel.indentStep,
-            compactOutput : curLevel.compactOutput,
-            filters : curLevel.filters
+            indentLength : cur_level.indentLength + cur_level.indentStep,
+            indentStep : cur_level.indentStep,
+            compactOutput : cur_level.compactOutput,
+            filters : cur_level.filters
         ))
     inc(context.level)
 
     for i in tag.forbiddenTags:
-        curLevel.forbiddenTags.incl(i)
+        cur_level.forbiddenTags.incl(i)
     for i in tag.forbiddenContent: 
-        curLevel.forbiddenCategories.incl(i)
+        cur_level.forbiddenCategories.incl(i)
 
 proc exit*(context: ParseContext) {.compileTime.} =
     assert context.level > 0
@@ -147,15 +201,15 @@ proc exit*(context: ParseContext) {.compileTime.} =
 
 proc accepts*(context: ParseContext, tag: TagDef): bool {.compileTime.} =
     result = false
-    if curLevel.permitted_content.contains(any_content):
+    if cur_level.permitted_content.contains(any_content):
         return true
-    if curLevel.forbiddenTags.contains(tag.id): return false
-    if curLevel.permittedTags.contains(tag.id):
+    if cur_level.forbiddenTags.contains(tag.id): return false
+    if cur_level.permittedTags.contains(tag.id):
         result = true
     for category in tag.contentCategories:
-        if curLevel.forbiddenCategories.contains(category):
+        if cur_level.forbiddenCategories.contains(category):
             return false
-        if curLevel.permitted_content.contains(category):
+        if cur_level.permitted_content.contains(category):
             result = true
 
 proc indentation*(context: ParseContext): string {.compileTime.} =
@@ -192,3 +246,13 @@ proc debug*(context: ParseContext): bool {.compileTime.} = context.debugOutput
 
 proc `debug=`*(context: ParseContext, val: bool) {.compileTime.} =
     context.debugOutput = val
+
+proc global_syms*(context: ParseContext): tuple[class: NimNode, obj: NimNode] =
+    (class: context.class.sym, obj: context.objName)
+
+proc cur_class*(context: ParseContext): TemplateClass = context.class
+
+proc `cur_class=`*(context: ParseContext, val: TemplateClass) =
+    context.class = val
+
+proc at_root*(context: ParseContext): bool = context.level == 0

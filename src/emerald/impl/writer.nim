@@ -14,6 +14,7 @@ type
         curFilters: seq[NimNode]
 
     StmtListWriter* = ref StmtListWriterObj not nil
+    OptionalStmtListWriter* = ref StmtListWriterObj
 
 proc newStmtListWriter*(streamName: NimNode, cache1: NimNode, cache2: NimNode,
                         lineRef: NimNode = nil):
