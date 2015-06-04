@@ -538,7 +538,7 @@ proc parse_children(writer: StmtListWriter, context: ParseContext,
                     if node[i].kind == nnkCall and
                             $node[i][0] == "mixin_content" and
                             node[i].len == 1:
-                        let mixinLevel = context.mixin_level()
+                        let mixinLevel = context.pop_mixin_level()
                         if not mixinLevel.callable:
                             quit_invalid(node[i][0], "mixin content",
                                     "not available")
@@ -557,6 +557,8 @@ proc parse_children(writer: StmtListWriter, context: ParseContext,
                         
                         mixinLevel.add_call(mixinWriter.result, callbackSym,
                                 mixinWriter.target_stream())
+                        
+                        context.push_mixin_level(mixinLevel)
                         
                         writer.add_node(newCall(callbackSym,
                                 writer.target_stream()))
@@ -599,7 +601,7 @@ proc parse_children(writer: StmtListWriter, context: ParseContext,
                 var
                     mixinLevel = if node.len > 2 and
                         node[2].kind == nnkStmtList: newMixinLevel(node[2],
-                                cache1, cache2) else: newMixinLevel(node[2])
+                                cache1, cache2) else: newMixinLevel(nil)
                 
                 context.push_mixin_level(mixinLevel)
                 
