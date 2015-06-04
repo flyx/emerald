@@ -168,13 +168,16 @@ proc process_block_replacements(content: NimNode,
                 # search for the method we override
                 var
                     curClass = class.parent
+                    nearestClass: NimNode = nil
                     methodName: NimNode = nil
+                    baseMethodName: NimNode = nil
                     methodContext: OptionalParseContext = nil
                 block outerLoop:
                     while curClass != nil:
                         for m in curClass.methods:
                             if m.name == blockName:
                                 methodName = genSym(nskMethod, $m.sym)
+                                baseMethodName = m.sym
                                 methodContext = m.context
                                 break outerLoop
                         curClass = curClass.parent
@@ -185,15 +188,26 @@ proc process_block_replacements(content: NimNode,
             
                     targetCotext.adapt_to_child_class(context)
             
+                    let streamName = genSym(nskParam, ":stream")
+                    var procContent = write_proc_content(streamName, node[2],
+                                                         methodContext)
+                    if node[0].ident_name == "append":
+                        procContent.insert(0, newNimNode(nnkCommand).add(
+                                ident("procCall"), newCall(baseMethodName,
+                                newCall(curClass.symbol, objName), streamName)))
+                    elif node[0].ident_name == "prepend":
+                        procContent.add(newNimNode(nnkCommand).add(
+                                ident("procCall"), newCall(baseMethodName,
+                                newCall(curClass.symbol, objName), streamName)))
+
                     let
-                        streamName = genSym(nskParam, ":stream")
                         meth = newProc(methodName, [newEmptyNode(),
                                 newIdentDefs(objName, className),
                                 newIdentDefs(streamName, ident("Stream"))],
-                                write_proc_content(streamName, node[2],
-                                methodContext), nnkMethodDef)
+                                procContent, nnkMethodDef)
             
                     class.add_method(blockName, methodName, methodContext)
+                    update_template_class(class)
                     context.global_stmt_list.add(meth)
             else:
                 quit_unexpected(node,

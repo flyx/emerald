@@ -1,1 +1,1 @@
-import basics, controlStructures, mixins
+import basics, controlStructures, mixins, inheritance
