@@ -18,6 +18,25 @@ proc withParams(title: string, content: bool) {.html_templ.} =
             if content:
                 p: "Content"
 
+proc tagClasses() {.html_templ.} =
+    {. compact_mode = true .}
+    body.main:
+        p(class="first"): "First paragraph"
+        p.second(class="last"): "Second paragraph"
+
+proc variables() {.html_templ.} =
+    {. compact_mode = true .}
+    var a = "a"
+    let c = "c"
+    const d = "d"
+    ul(class=d):
+        for i in 1..3:
+            if i == 2:
+                a = "b"
+                li: c
+            else:
+                li: a
+
 suite "basics":
     test "basic template without parameters":
         var ss = newStringStream()
@@ -62,3 +81,16 @@ suite "basics":
     </body>
 </html>
 """
+
+    test "tag classes":
+        var ss = newStringStream()
+        tagClasses.render(ss)
+        ss.flush()
+        check ss.data == """<body class="main"><p class="first">First paragraph</p><p class="second last">Second paragraph</p></body>"""
+    
+    test "variables":
+        var ss = newStringStream()
+        variables.render(ss)
+        ss.flush()
+        check ss.data == """<ul class="d"><li>a</li><li>c</li><li>b</li></ul>"""
+        

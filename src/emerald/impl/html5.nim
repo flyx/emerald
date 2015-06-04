@@ -1,20 +1,12 @@
 import tables, sets, hashes, macros
 import tagdef
 
-static:
-    const 
-        globalAttributes : HashSet[string] = toSet([
-                "acceskey", "contenteditable", "contextmenu", "dir",
-                "draggable", "dropzone", "hidden", "id", "itemid",
-                "itemprop", "itemref", "itemscope", "itemtype",
-                "lang", "spellcheck", "style", "tabindex", "title"])
-
 tag_list:
     global:
-        attributes = (accesskey, contenteditable, contextmenu, dir, draggable,
-                      dropzone, hidden, id, itemid, itemprop, itemref,
-                      itemscope, itemtype, lang, spellcheck, style, tabindex,
-                      title,
+        attributes = (accesskey, class, contenteditable, contextmenu, dir,
+                      draggable, dropzone, hidden, id, itemid, itemprop,
+                      itemref, itemscope, itemtype, lang, spellcheck, style,
+                      tabindex, title,
                       onabort, onautocomplete, onautocompleteerror, onblur,
                       oncancel, oncanplay, oncanplaythrough, onchange, onclick,
                       onclose, oncontextmenu, oncuechange, ondblclick, ondrag,
