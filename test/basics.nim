@@ -2,6 +2,8 @@ import unittest
 
 include ../src/emerald
 
+import basics_publicTemplate
+
 proc base() {.html_templ.} =
     html(lang="en"):
         head:
@@ -23,6 +25,7 @@ proc tagClasses() {.html_templ.} =
     body.main:
         p(class="first"): "First paragraph"
         p.second(class="last"): "Second paragraph"
+        footer.footer.realLast: "Footer"
 
 proc variables() {.html_templ.} =
     {. compact_mode = true .}
@@ -86,11 +89,16 @@ suite "basics":
         var ss = newStringStream()
         tagClasses.render(ss)
         ss.flush()
-        check ss.data == """<body class="main"><p class="first">First paragraph</p><p class="second last">Second paragraph</p></body>"""
+        check ss.data == """<body class="main"><p class="first">First paragraph</p><p class="second last">Second paragraph</p><footer class="footer realLast">Footer</footer></body>"""
     
     test "variables":
         var ss = newStringStream()
         variables.render(ss)
         ss.flush()
         check ss.data == """<ul class="d"><li>a</li><li>c</li><li>b</li></ul>"""
-        
+    
+    test "public":
+        var ss = newStringStream()
+        publicTemplate.render(ss)
+        ss.flush()
+        check ss.data == """<body><p>Content</p></body>"""

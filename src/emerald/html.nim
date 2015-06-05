@@ -28,7 +28,8 @@ proc ident_name(node: NimNode): string {.compileTime, inline.} =
     ## Used to be able to parse accent-quoted HTML tags as well.
     ## A prominent HTML tag is <div>, which is a keyword in Nimrod.
     ## You can either escape it with ``, or simply use "d" as a substitute.
-    let name: string = if node.kind == nnkAccQuoted: $node[0] else: $node
+    let name: string = if node.kind == nnkAccQuoted: $node[0]
+            elif node.kind == nnkPostfix: $node[1] else: $node
     result = if name == "d": "div" else: name
 
 # mixins are compiled each time they're used. This variable stores the
@@ -254,22 +255,22 @@ macro html_templ*(arg1: expr, arg2: expr = nil): stmt =
 
     # define a class type for the template object
     let
-        classIdent = genSym(nskType, ":class-" & content[0].ident_name)
-        className = if content[0].kind == nnkPostfix: newNimNode(nnkPostfix
-                ).add(ident("*"), classIdent) else: classIdent
+        className = genSym(nskType, ":class-" & content[0].ident_name)        
         streamName = genSym(nskParam, ":stream")
         objName = genSym(nskParam, ":obj")
     result = newStmtList(newNimNode(nnkTypeSection).add(
-        newNimNode(nnkTypeDef).add(className, newEmptyNode(),
-        newNimNode(nnkRefTy).add(newNimNode(nnkObjectTy).add(newEmptyNode(),
-        newNimNode(nnkOfInherit).add(if parent == nil: ident("RootObj") else:
-        parentClass.symbol), newEmptyNode()
+        newNimNode(nnkTypeDef).add(if content[0].kind == nnkPostfix:
+        newNimNode(nnkPostfix).add(ident("*"), className) else: className,
+        newEmptyNode(), newNimNode(nnkRefTy).add(newNimNode(nnkObjectTy).add(
+        newEmptyNode(), newNimNode(nnkOfInherit).add(if parent == nil: ident(
+        "RootObj") else: parentClass.symbol), newEmptyNode()
     )))))
     
     # define render method
     var 
         templClass = newTemplateClass(className, parentClass)
-        context = newContext(result, templClass, objName)
+        context = newContext(result, templClass, objName,
+                content[0].kind == nnkPostfix)
         formalParams = newNimNode(nnkFormalParams).add(newEmptyNode(),
             newIdentDefs(objName, className),
             newIdentDefs(streamName, ident("Stream"))
@@ -285,22 +286,25 @@ macro html_templ*(arg1: expr, arg2: expr = nil): stmt =
     if parentClass == nil:
         stmts = write_proc_content(streamName, content[6], context)
     else:
-        stmts = newCall(newNimNode(nnkDotExpr).add(newCall(parentClass.symbol,
-                objName), ident("render")),
-                streamName)
+        var call = newCall(ident("render"),
+                newCall(parentClass.symbol, objName), streamName)
         for i in 1 .. (parent.len - 1):
-            stmts.add(parent[i])
+            call.add(parent[i])
+        stmts = newNimNode(nnkCommand).add(ident("procCall"), call)
+        
         process_block_replacements(content[6], context)
     
     # add render proc
     result.add(newNimNode(nnkProcDef).add(renderName,
         newEmptyNode(), newEmptyNode(), formalParams, newEmptyNode(),
         newEmptyNode(), stmts
-    ))  
+    ))
     
     # define template object
     result.add(newNimNode(nnkLetSection).add(newIdentDefs(
-        ident($content[0].ident), newEmptyNode(), newCall(className)
+        if content[0].kind == nnkPostfix: newNimNode(nnkPostfix).add(ident("*"),
+        ident(content[0].ident_name)) else: ident(content[0].ident_name),
+        newEmptyNode(), newCall(className)
     )))
     
     if context.debug:
@@ -486,7 +490,7 @@ proc parse_children(writer: StmtListWriter, context: ParseContext,
             if context.mode == unknown:
                 context.mode = flowmode
             writer.add_filtered(node.strVal)
-        of nnkInfix:
+        of nnkInfix, nnkDotExpr:
             if context.mode == unknown:
                 context.mode = flowmode
             writer.add_filtered(node)
@@ -527,8 +531,9 @@ proc parse_children(writer: StmtListWriter, context: ParseContext,
                 methodName = genSym(nskMethod, ":block-" & templ.name() & "-" &
                         blockName)
                 streamName = genSym(nskParam, ":stream")
-                meth = newProc(methodName, [newEmptyNode(),
-                        newIdentDefs(objName, className),
+                meth = newProc(if context.public: newNimNode(nnkPostfix).add(
+                        ident("*"), methodName) else: methodName,
+                        [newEmptyNode(), newIdentDefs(objName, className),
                         newIdentDefs(streamName, ident("Stream"))],
                         write_proc_content(streamName, node[1], context),
                         nnkMethodDef)

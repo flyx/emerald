@@ -42,6 +42,7 @@ type
         level: int
         levelProps: seq[ContextLevel]
         mixinLevels: seq[MixinLevel]
+        isPublic: bool
 
 proc copy*(context: ParseContext): ParseContext {.compileTime.}
 
@@ -66,7 +67,11 @@ iterator methods*(class: TemplateClass):
     for m in class.meths:
         yield m
 
-proc name*(class: TemplateClass): string {.compileTime.} = $class.sym
+proc name*(class: TemplateClass): string {.compileTime.} =
+    if class.sym.kind == nnkPostfix:
+        result = $class.sym[1]
+    else:
+        result = $class.sym
 
 proc parent*(class: TemplateClass): TemplateClass {.compileTime.} =
     class.parentClass
@@ -122,6 +127,7 @@ proc callback_caches*(ml: MixinLevel):
 proc newContext*(globalStmtList: NimNode,
                  class: TemplateClass,
                  objName: NimNode = newEmptyNode(),
+                 public: bool = false,
                  primaryTagId : ExtendedTagId = unknownTag,
                  mode: OutputMode = unknown): ParseContext {.compileTime.} =
     new(result)
@@ -129,6 +135,7 @@ proc newContext*(globalStmtList: NimNode,
     result.objName = objName
     result.debugOutput = false
     result.globalStmtList = globalStmtList
+    result.isPublic = public
     result.level = 0
     result.mixinLevels = newSeq[MixinLevel]()
     result.levelProps = @[ContextLevel(
@@ -152,6 +159,7 @@ proc copy*(context: ParseContext): ParseContext =
     result.class = context.class
     result.objName = context.objName
     result.debugOutput = context.debugOutput
+    result.isPublic = context.isPublic
     result.globalStmtList = copyNimTree(context.globalStmtList)
     result.level = context.level
     result.mixinLevels = newSeq[MixinLevel]()
@@ -246,6 +254,8 @@ proc debug*(context: ParseContext): bool {.compileTime.} = context.debugOutput
 
 proc `debug=`*(context: ParseContext, val: bool) {.compileTime.} =
     context.debugOutput = val
+
+proc public*(context: ParseContext): bool {. compileTime.} = context.isPublic
 
 proc global_syms*(context: ParseContext): tuple[class: NimNode, obj: NimNode] =
     (class: context.class.sym, obj: context.objName)
