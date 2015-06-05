@@ -5,3 +5,7 @@ task "build", "build emerald library":
 
 task "test", "run emerald test suite":
     shell(nimExe, "c", "-d:debug -r", "test/tests.nim")
+
+task "documentation", "build documentation site":
+    withDir "doc":
+        shell(nimExe, "c", "-d:debug -r", "generate.nim")
