@@ -1,4 +1,4 @@
-import streams, strtabs
+import streams, strtabs, osproc
 import packages.docutils.rstgen
 import packages.docutils.rst
 
@@ -49,3 +49,18 @@ proc change_indentation*(target: Stream, value: string,
 proc rst*(target: Stream, value: string, options: TRstParseOptions = {},
          config: StringTableRef = newStringTable()) =
     target.write(rstToHtml(value, options, config))
+
+proc pygmentize*(target: Stream, value: string, language: string) =
+    var p = startProcess("pygmentize -l " & language & " -f html",
+            options={poEvalCommand})
+    var input = p.inputStream
+    var output = p.outputStream
+    input.write(value)
+    input.flush()
+    input.close()
+    discard p.waitForExit()
+    var c = output.readChar()
+    while c != char(0):
+        target.write(c)
+        c = output.readChar()
+    p.close()

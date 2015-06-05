@@ -120,14 +120,31 @@ proc process_pragma(writer: OptionalStmtListWriter, node: NimNode,
                 var result = newSeq[NimNode]()
                 add_filters(result, node[1], context)
                 context.filters = result
-                writer.filters = context.filters &
-                        newCall("change_indentation",
-                        newStrLitNode(context.indentation))
+                if context.preserve_whitespace:
+                    writer.filters = context.filters
+                else:
+                    writer.filters = context.filters &
+                            newCall("change_indentation",
+                            newStrLitNode(context.indentation))
             else:
                 quit_invalid(node, "`filters` pragma",
                         "not allowed on root level of inheriting template")
         of "debug":
             context.debug = bool_from_ident(node[1])
+        of "preserve_whitespace":
+            if writer != nil:
+                let pw = bool_from_ident(node[1])
+                if pw != context.preserve_whitespace:
+                    context.preserve_whitespace = pw
+                    if pw:
+                        writer.filters = context.filters
+                    else:
+                        writer.filters = context.filters &
+                                newCall("change_indentation",
+                                newStrLitNode(context.indentation))
+            else:
+                quit_invalid(node, "`preserve_indentation` pragma",
+                        "not allowed on root level of inheriting template")
         else:
             quit_unknown(node[0], "configuration value name",
                     $node[0].ident)

@@ -33,6 +33,7 @@ type
         indentStep: int
         compactOutput: bool
         filters: seq[NimNode]
+        preserveWhitespace: bool
 
     ContextObj = object
         class: TemplateClass
@@ -147,7 +148,8 @@ proc newContext*(globalStmtList: NimNode,
             indentLength : 0,
             indentStep : 4,
             compactOutput: false,
-            filters: newSeq[NimNode]()
+            filters: newSeq[NimNode](),
+            preserveWhitespace: false
         )]
     if primaryTagId == low(TagId) - 1:
         result.levelProps[0].permitted_content.incl(any_content)
@@ -193,7 +195,8 @@ proc enter*(context: ParseContext, tag: TagDef) {.compileTime.} =
             indentLength : cur_level.indentLength + cur_level.indentStep,
             indentStep : cur_level.indentStep,
             compactOutput : cur_level.compactOutput,
-            filters : cur_level.filters
+            filters : cur_level.filters,
+            preserveWhitespace: cur_level.preserveWhitespace
         ))
     inc(context.level)
 
@@ -231,6 +234,12 @@ proc compact_output*(context: ParseContext): bool {.compileTime.} =
 
 proc `compact_output=`*(context: ParseContext, val: bool) {.compileTime.} =
     curLevel.compactOutput = val
+
+proc preserve_whitespace*(context: ParseContext): bool {.compileTime.} =
+    curLevel.preserveWhitespace
+
+proc `preserve_whitespace=`*(context: ParseContext, val: bool) {.compileTime.} =
+    curLevel.preserveWhitespace = val
 
 proc filters*(context: ParseContext): seq[NimNode] {.compileTime.} =
     curLevel.filters
