@@ -100,6 +100,8 @@ proc add_filters(target: var seq[NimNode], node: NimNode,
             quit_unexpected(node, "identifier", $node.ident)
     of nnkCall:
         target.add(node)
+    of nnkNilLit:
+        discard
     else:
         quit_unexpected(node, "token", node.kind)
 
