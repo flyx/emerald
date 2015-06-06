@@ -5,7 +5,7 @@ var sites*: seq[tuple[title: string, url: string]] =
 
 proc layout*(title: string,
              sites: seq[tuple[title: string, url: string]]) {. html_templ .} =
-    {. debug = true .}
+    {. compact_mode = true .}
     html(lang="en"):
         head:
             title: title
@@ -16,18 +16,15 @@ proc layout*(title: string,
                 h1: "emerald"
                 h2:
                     "a HTML templating engine for "
-                    a(href="http://nim-lang.org/"): "Nim"
+                    a(href="http://nim-lang.org/", "Nim")
             main:
                 nav:
                     ul:
                         for site in sites:
                             li(class=if site.title == title: "active" else: ""):
-                                a(href=site.url):
-                                    site.title
+                                a(href=site.url, site.title)
                 article:
-                    block content:
-                        discard
-            
+                    block content: discard
             footer:
                 p: "This documentation has been generated with emerald."
             
