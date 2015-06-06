@@ -27,6 +27,12 @@ proc tagClasses() {.html_templ.} =
         p.second(class="last"): "Second paragraph"
         footer.footer.realLast: "Footer"
 
+proc tagsWithDirectContent() {.html_templ.} =
+    {. compact_mode = true .}
+    body:
+        strong("Strong text")
+        a(href="home.html", "home")
+
 proc variables() {.html_templ.} =
     {. compact_mode = true .}
     var a = "a"
@@ -90,6 +96,11 @@ suite "basics":
         tagClasses.render(ss)
         ss.flush()
         check ss.data == """<body class="main"><p class="first">First paragraph</p><p class="second last">Second paragraph</p><footer class="footer realLast">Footer</footer></body>"""
+    
+    test "tags with direct content":
+        var ss = newStringStream()
+        tagsWithDirectContent.render(ss)
+        check ss.data == """<body><strong>Strong text</strong><a href="home.html">home</a></body>"""
     
     test "variables":
         var ss = newStringStream()

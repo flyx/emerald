@@ -396,16 +396,17 @@ proc parse_tag(writer: StmtListWriter, context: ParseContext,
     var
         required_attrs = tag.required_attrs
         optional_attrs = tag.optional_attrs
+        directContent: NimNode = nil
     
     let max = if node[node.len - 1].kind == nnkStmtList:
             node.len - 2 else: node.len - 1
     for i in 1 .. max:
         case node[i].kind
-        of nnkStrLit, nnkCall:
-            if i == 1:
-                writer.add_attr_val("id", node[i])
+        of nnkStrLit, nnkCall, nnkInfix, nnkDotExpr:
+            if directContent != nil:
+                quit_duplicate(node[i], "direct content", $node[i].kind)
             else:
-                quit_unexpected(node[i], "token [4]", node[i].kind)
+                directContent = node[i]
         of nnkExprEqExpr:
             if not (node[i][0].kind in [nnkIdent, nnkAccQuoted]):
                 quit_unexpected(node[i][0], "token", node[i][0].kind)
@@ -452,6 +453,9 @@ proc parse_tag(writer: StmtListWriter, context: ParseContext,
         quit_missing(node, "attribute(s) for tag " & name & ": " & list)
     
     if node[node.len - 1].kind == nnkStmtList:
+        if directContent != nil:
+            quit_unexpected(node[node.len - 1], "HTML tag content",
+                    "already has direct content")
         writer.add_literal(">")
         context.enter(tag)
         writer.filters = context.filters & newCall("change_indentation",
@@ -461,6 +465,10 @@ proc parse_tag(writer: StmtListWriter, context: ParseContext,
         context.exit()
         if finishInBlockMode:
             writer.add_literal(context.indentation)
+        writer.add_literal("</" & name & ">")
+    elif directContent != nil:
+        writer.add_literal(">")
+        writer.add_filtered(directContent)
         writer.add_literal("</" & name & ">")
     elif tag.tag_omission:
         writer.add_literal("/>")
