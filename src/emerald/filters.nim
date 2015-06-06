@@ -24,26 +24,34 @@ proc escape_html*(target: Stream, value : string,
 
 proc change_indentation*(target: Stream, value: string,
                          indentation: string) =
-    var in_indentation = false
-    var initial = true
+    var
+        in_indentation = false
+        initial = true
+        consumed_whitespace = false
     for c in value:
         case c
         of '\l':
             if initial:
                 initial = false
+                consumed_whitespace = true
             if in_indentation:
                 target.write('\l')
             else:
                 in_indentation = true
         of ' ':
-            if not in_indentation and not initial:
-                target.write(' ')
+            if initial:
+                consumed_whitespace = true
+            else:
+                if not in_indentation:
+                    target.write(' ')
         else:
+            if initial:
+                initial = false
+                if consumed_whitespace and not in_indentation:
+                    target.write(' ');
             if in_indentation:
                 target.write('\l' & indentation)
                 in_indentation = false
-            if initial:
-                initial = false
             target.write(c)
 
 proc rst*(target: Stream, value: string, options: TRstParseOptions = {},
