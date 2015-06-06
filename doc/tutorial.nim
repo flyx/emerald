@@ -2,11 +2,12 @@ include ../src/emerald
 
 import layout
 
-layout.sites.add((title: "Tutorial", url: "tutorial.html"))
+layout.sites.add((title: "Tutorial", url: "tutorial.html", anchors: @[]))
 
-proc tut*(sites: seq[tuple[title: string, url: string]])
+proc tut*(sites: seq[site])
     {. html_templ: layout("Tutorial", sites) .} =
     replace content:
+        h1: "Tutorial"
         section:
             p:
                 """To be able to use emerald, you need to have it available on

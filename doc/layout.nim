@@ -1,10 +1,13 @@
 include ../src/emerald
 
-var sites*: seq[tuple[title: string, url: string]] =
-        newSeq[tuple[title: string, url: string]]()
+type
+    anchor* = tuple[caption: string, id: string]
+    site* = tuple[title: string, url: string, anchors: seq[anchor]]
+
+var sites*: seq[site] = newSeq[site]()
 
 proc layout*(title: string,
-             sites: seq[tuple[title: string, url: string]]) {. html_templ .} =
+             sites: seq[site]) {. html_templ .} =
     {. compact_mode = true .}
     html(lang="en"):
         head:
@@ -23,6 +26,9 @@ proc layout*(title: string,
                         for site in sites:
                             li(class=if site.title == title: "active" else: ""):
                                 a(href=site.url, site.title)
+                            if site.title == title:
+                                for a in site.anchors:
+                                    li.anchor: a(href="#" & a.id, a.caption)
                 article:
                     block content: discard
             footer:

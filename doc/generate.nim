@@ -1,4 +1,4 @@
-import mainPage, tutorial, layout
+import mainPage, tutorial, documentation, layout
 
 import streams, os
 
@@ -11,3 +11,6 @@ mainPage.home.render(fs, sites)
 
 fs = newFileStream("site/tutorial.html", fmWrite)
 tutorial.tut.render(fs, sites)
+
+fs = newFileStream("site/documentation.html", fmWrite)
+documentation.doc.render(fs, sites)

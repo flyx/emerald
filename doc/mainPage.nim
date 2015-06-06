@@ -2,9 +2,9 @@ include ../src/emerald
 
 import layout
 
-layout.sites.add((title: "Home", url: "home.html"))
+layout.sites.add((title: "Home", url: "home.html", anchors: @[]))
 
-proc home*(sites: seq[tuple[title: string, url: string]])
+proc home*(sites: seq[site])
         {. html_templ: layout("Home", sites) .} =
     {. debug = true .}
     replace content:
@@ -15,7 +15,7 @@ proc home*(sites: seq[tuple[title: string, url: string]])
             include:"""
         ul:
             li: strong("HTML validation"); """: emerald validates your HTML
-                structure when it compiles your template. This validation checks`
+                structure when it compiles your template. This validation checks
                 for unknown, ill-placed and missing HTML tags and attributes,
                 but does not implement the whole HTML 5 spec. It is a tool for
                 you to discover errors early."""
