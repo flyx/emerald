@@ -7,19 +7,19 @@ import impl/tagdef
 import filters
 
 template quit_unknown[T](node: NimNode, what: string, val: T) =
-    quit node.lineInfo & ": Unknown " & what & ": \"" & $val & "\""
+    quit "[emerald] " & node.lineInfo & ": Unknown " & what & ": \"" & $val & "\""
 
 template quit_unexpected[T](node: NimNode, what: string, val: T) =
-    quit node.lineInfo & ": Unexpected " & what & ": \"" & $val & "\""
+    quit "[emerald] " & node.lineInfo & ": Unexpected " & what & ": \"" & $val & "\""
 
 template quit_duplicate[T](node: NimNode, what: string, val: T) =
-    quit node.lineInfo & ": Duplicate " & what & ": \"" & $val & "\""
+    quit "[emerald] " & node.lineInfo & ": Duplicate " & what & ": \"" & $val & "\""
 
 template quit_invalid[T](node: NimNode, what: string, val: T) =
-    quit node.lineInfo & ": Invalid " & what & ": \"" & $val & "\""
+    quit "[emerald] " & node.lineInfo & ": Invalid " & what & ": \"" & $val & "\""
 
 template quit_missing(node: NimNode, what: string) =
-    quit node.lineInfo & ": Missing " & what
+    quit "[emerald] " & node.lineInfo & ": Missing " & what
 
 proc parse_children(writer: StmtListWriter, context: ParseContext,
                          content: NimNode) {. compileTime .}
@@ -28,6 +28,10 @@ proc ident_name(node: NimNode): string {.compileTime, inline.} =
     ## Used to be able to parse accent-quoted HTML tags as well.
     ## A prominent HTML tag is <div>, which is a keyword in Nimrod.
     ## You can either escape it with ``, or simply use "d" as a substitute.
+    if not (node.kind in [nnkAccQuoted, nnkPostfix, nnkIdent]):
+        quit_invalid(node, "token (expected ident, accent-quoted, or postfix)",
+                $node.kind)
+    
     let name: string = if node.kind == nnkAccQuoted: $node[0]
             elif node.kind == nnkPostfix: $node[1] else: $node
     result = if name == "d": "div" else: name
