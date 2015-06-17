@@ -6,6 +6,7 @@ layout.sites.add((title: "Documentation", url: "documentation.html",
                   anchors: @[("Interface", "interface"), ("Tags", "tags"),
                              ("Attributes", "attributes"),
                              ("Text Content", "content"),
+                             ("Control Structures", "control"),
                              ("Pragmas", "pragmas"), ("Filters", "filters"),
                              ("Template inheritance", "inheritance")]))
 
@@ -310,6 +311,39 @@ proc templ() {.html_templ.} =
                 code("&"); """ to their corresponding HTML entities. The filter
                 chain can be customized to your needs, see the next section."""
         section:
+            figure:
+                {. filters = pygmentize("nim") .}
+                {. preserve_whitespace = true .}
+                """
+proc templ() {.html_templ.} =
+    # define variables
+    const max = 5
+    var current = 2
+    
+    ul:
+        # use a for loop
+        for i in 0 .. val:
+            li:
+                # use if
+                if i == current:
+                    i
+                else:
+                    a(href=$i & ".html", i)
+"""
+                {. filters = escape_html() .}
+                {. preserve_whitespace = false .}
+            h2(id="control"): "Control structures"
+            p:
+                """Most of Nim's control structures are directly usable in
+                emerald: You can use """; code("if"); ", "; code("case")
+                " and "; code("while"); """ just like you would in Nim code.
+                You can also declare and assign variables in your template.
+                However, you cannot do everything in emerald you could do in
+                Nim, and if you need to write logic that spans more than a few
+                lines, it is probably a good idea to write it in a proper Nim
+                proc and call that from within your template."""
+        
+        section:
             h2(id="pragmas"): "Pragmas"
             p:
                 """You can modify the way emerald compiles your template by
@@ -378,6 +412,7 @@ proc templ() {.html_templ.} =
                 # pygments.
                 {. filters = pygmentize("nim") .}
                 """""" & """
+
 proc foo() =
     bar()
                 """""" & """
@@ -469,4 +504,50 @@ proc remove_vowels(target: Stream, value : string) =
                 code("value"); " and write the result to "; code("target")
                 ". That's all."
         section:
+            figure:
+                {. filters = pygmentize("nim") .}
+                {. preserve_whitespace = true .}
+                """
+proc parent(title: string,
+            homeUrl: string) {. html_templ .} =
+    html(lang="en"):
+        head:
+            title: title
+        body:
+            h1:
+                a(href=homeUrl): title
+            block content: discard
+
+proc home(homeUrl: string)
+        {. html_templ: parent("Home", homeUrl) .} =
+    replace content:
+        p: "Content"
+"""
+                {. filters = escape_html() .}
+                {. preserve_whitespace = false .}
+                figcaption: "inheriting from a template"
+        
             h2(id="inheritance"): "Template Inheritance"
+            p:
+                """You can inherit from templates by specifying the parent
+                template when declaring the child template. When inheriting, you
+                need to specify a value for each non-optional parameter of the
+                parent template. You may use parameters of the child template to
+                set these values."""
+            p:
+                """In any template that inherits from another template, you
+                cannot have HTML tags or text content nodes on the root level.
+                Insead, you can specify the following commands:"""
+                code("prepend"); ", "; code("replace"); " and "; code("append")
+                """. Each of these takes one argument and must have a child
+                block. The argument must be the name of a block in any parent
+                template (does not need to be the immediate parent)."""
+                code("prepend"); """ will add its content before the content of
+                the block in the parent template, """; code("replace")
+                """ will completely replace the content of the block, and """
+                code("append"); """ will append its content to the block in
+                the parent template."""
+            p:
+                """Blocks must always have names in templates. You may still use
+                them for scoping variables as you can do it in Nim, but be aware
+                that each block will be compiled into a multimethod."""
