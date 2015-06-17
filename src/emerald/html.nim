@@ -298,10 +298,11 @@ macro html_templ*(arg1: expr, arg2: expr = nil): stmt =
             newIdentDefs(objName, className),
             newIdentDefs(streamName, ident("Stream"))
         )
-    templateClasses.add(templClass)
     for identDef in content[3].children:
         if identDef.kind != nnkEmpty:
             formalParams.add(copyNimTree(identDef))
+            templClass.add_param(copyNimTree(identDef))
+    templateClasses.add(templClass)
     let renderName = if content[0].kind == nnkPostfix: newNimNode(nnkPostfix
             ).add(ident("*"), ident("render")) else: ident("render")
     

@@ -7,6 +7,7 @@ type
         sym: NimNode
         parentClass: TemplateClass
         meths: seq[tuple[name: string, sym: NimNode, context: ParseContext]]
+        userParams: NimNode
 
     OutputMode* = enum
         unknown, blockmode, flowmode
@@ -50,12 +51,13 @@ proc copy*(context: ParseContext): ParseContext {.compileTime.}
 proc `mode=`*(context: ParseContext, val: OutputMode) {.inline, compileTime.}
 
 proc newTemplateClass*(sym: NimNode, parent: TemplateClass = nil):
-        TemplateClass =
+        TemplateClass {.compileTime.} =
     new(result)
     result.sym = sym
     result.parentClass = parent
     result.meths = newSeq[tuple[name: string, sym: NimNode,
                                 context: ParseContext]]()
+    result.userParams = newNimNode(nnkFormalParams)
 
 proc add_method*(class: TemplateClass, name: string, sym: NimNode,
                  context: ParseContext) {.compileTime.} =
@@ -80,6 +82,11 @@ proc parent*(class: TemplateClass): TemplateClass {.compileTime.} =
 proc symbol*(class: TemplateClass): NimNode {.compileTime.} = class.sym
 
 template cur_level(): auto {.dirty.} = context.levelProps[context.level]
+
+proc params*(class: TemplateClass): NimNode {.compileTime.} = class.userParams
+
+proc add_param*(class: TemplateClass, param: NimNode) {.compileTime.} =
+    class.userParams.add(param)
 
 proc mode*(context: ParseContext): OutputMode {.inline, noSideEffect,
                                                 compileTime.} =
