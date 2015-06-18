@@ -48,8 +48,10 @@ proc variables() {.html_templ.} =
 
 suite "basics":
     test "basic template without parameters":
-        var ss = newStringStream()
-        base.render(ss)
+        var
+            ss = newStringStream()
+            templ = newBase()
+        templ.render(ss)
         ss.flush()
         check ss.data == """<!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
@@ -63,8 +65,12 @@ suite "basics":
 """
 
     test "basic template with parameters":
-        var ss = newStringStream()
-        withParams.render(ss, "T1", false)
+        var
+            ss = newStringStream()
+            templ = newWithParams()
+        templ.title = "T1"
+        templ.content = false
+        templ.render(ss)
         ss.flush()
         check ss.data == """<!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
@@ -77,7 +83,9 @@ suite "basics":
 </html>
 """
         ss = newStringStream()
-        withParams.render(ss, "T2", true)
+        templ.title = "T2"
+        templ.content = true
+        templ.render(ss)
         ss.flush()
         check ss.data == """<!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
@@ -92,24 +100,33 @@ suite "basics":
 """
 
     test "tag classes":
-        var ss = newStringStream()
-        tagClasses.render(ss)
+        var
+            ss = newStringStream()
+            templ = newTagClasses()
+        templ.render(ss)
         ss.flush()
         check ss.data == """<body class="main"><p class="first">First paragraph</p><p class="second last">Second paragraph</p><footer class="footer realLast">Footer</footer></body>"""
     
     test "tags with direct content":
-        var ss = newStringStream()
-        tagsWithDirectContent.render(ss)
+        var
+            ss = newStringStream()
+            templ = newTagsWithDirectContent()
+        templ.render(ss)
+        ss.flush()
         check ss.data == """<body><strong>Strong text</strong><a href="home.html">home</a></body>"""
     
     test "variables":
-        var ss = newStringStream()
-        variables.render(ss)
+        var
+            ss = newStringStream()
+            templ = newVariables()
+        templ.render(ss)
         ss.flush()
         check ss.data == """<ul class="d"><li>a</li><li>c</li><li>b</li></ul>"""
     
     test "public":
-        var ss = newStringStream()
-        publicTemplate.render(ss)
+        var
+            ss = newStringStream()
+            templ = newPublicTemplate()
+        templ.render(ss)
         ss.flush()
         check ss.data == """<body><p>Content</p></body>"""

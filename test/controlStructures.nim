@@ -40,41 +40,57 @@ proc case_test(i: int) {.html_templ.} =
 
 suite "control structures":
     test "if":
-        var ss = newStringStream()
-        if_test.render(ss, false, false, false)
+        var
+            ss = newStringStream()
+            templ = newIfTest()
+        templ.b1 = false
+        templ.b2 = false
+        templ.b3 = false
+        templ.render(ss)
         ss.flush()
         check ss.data == """<body><img src="heading"/></body>"""
         ss = newStringStream()
-        if_test.render(ss, true, false, false)
+        templ.b1 = true
+        templ.render(ss)
         ss.flush()
         check ss.data == """<body><header><h1>NoB2</h1><h2>Subtitle</h2></header></body>"""
         ss = newStringStream()
-        if_test.render(ss, true, true, false)
+        templ.b2 = true
+        templ.render(ss)
         ss.flush()
         check ss.data == """<body><header><h1>B2</h1><h2>Subtitle</h2></header></body>"""
         ss = newStringStream()
-        if_test.render(ss, false, true, true)
+        templ.b1 = false
+        templ.b3 = true
+        templ.render(ss)
         ss.flush()
         check ss.data == """<body><div><h1>B2</h1><h2>Subtitle</h2></div></body>"""
     
     test "case":
-        var ss = newStringStream()
-        case_test.render(ss, 1)
+        var
+            ss = newStringStream()
+            templ = newCaseTest()
+        templ.i = 1
+        templ.render(ss)
         ss.flush()
         check ss.data == """<body><h1>1</h1></body>"""
         ss = newStringStream()
-        case_test.render(ss, 2)
+        templ.i = 2
+        templ.render(ss)
         ss.flush()
         check ss.data == """<body><p>2</p></body>"""
         ss = newStringStream()
-        case_test.render(ss, 3)
+        templ.i = 3
+        templ.render(ss)
         ss.flush()
         check ss.data == """<body><nav><p>3</p></nav></body>"""
         ss = newStringStream()
-        case_test.render(ss, 4)
+        templ.i = 4
+        templ.render(ss)
         ss.flush()
         check ss.data == """<body>default</body>"""
         ss = newStringStream()
-        case_test.render(ss, 10)
+        templ.i = 10
+        templ.render(ss)
         ss.flush()
         check ss.data == """<body><footer><p>10</p></footer></body>"""

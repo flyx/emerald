@@ -57,31 +57,41 @@ proc templ_with_stacked_mixins() {. html_templ .} =
 
 suite "mixins":
     test "simple mixin":
-        var ss = newStringStream()
-        simple_templ.render(ss)
+        var
+            ss = newStringStream()
+            templ = newSimpleTempl()
+        templ.render(ss)
         ss.flush()
         check ss.data == """<body><p>Simple mixin</p></body>"""
     
     test "mixin with params":
-        var ss = newStringStream()
-        templ_for_mixin_with_params.render(ss)
+        var
+            ss = newStringStream()
+            templ = newTemplForMixinWithParams()
+        templ.render(ss)
         ss.flush()
         check ss.data == """<body><p>Content</p></body>"""
     
     test "mixin with content":
-        var ss = newStringStream()
-        templ_for_mixin_with_content.render(ss)
+        var
+            ss = newStringStream()
+            templ = newTemplForMixinWithContent()
+        templ.render(ss)
         ss.flush()
         check ss.data == """<body><div><p>Content</p></div></body>"""
     
     test "mixin with params and content":
-        var ss = newStringStream()
-        templ_for_mixin_with_params_and_content.render(ss)
+        var
+            ss = newStringStream()
+            templ = newTemplForMixinWithParamsAndContent()
+        templ.render(ss)
         ss.flush()
         check ss.data == """<body><h1>Title</h1><div><p>Content</p></div></body>"""
     
     test "stacked mixins":
-        var ss = newStringStream()
-        templ_with_stacked_mixins.render(ss)
+        var
+            ss = newStringStream()
+            templ = newTemplWithStackedMixins()
+        templ.render(ss)
         ss.flush()
         check ss.data == """<body><div><footer><p>Content</p><p>Author</p></footer></div></body>"""

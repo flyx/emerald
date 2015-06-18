@@ -157,10 +157,46 @@ proc process_pragma(writer: OptionalStmtListWriter, node: NimNode,
     else:
         quit_invalid(node, "pragma content", $node.kind)
 
+proc copy_tree_replace_params(context: ParseContext, node: NimNode): NimNode
+        {.compileTime.} =
+    if node.kind == nnkIdent:
+        var isTemplParam = false
+        block searchForParam:
+            var class = context.cur_class
+            while class != nil:
+                for param in class.params.children:
+                    if $param[0].ident == $node.ident:
+                        isTemplParam = true
+                        break searchForParam
+                class = class.parent
+        if isTemplParam:
+            result = newNimNode(nnkDotExpr).add(context.global_syms.obj, node)
+        else:
+            result = node
+    else:
+        result = copyNimNode(node)
+        for child in node.children:
+            result.add(copy_tree_replace_params(context, child))
+
 proc process_block_replacements(content: NimNode,
-        context: ParseContext) {.compileTime.} =
+        context: ParseContext, renderBody: NimNode) {.compileTime.} =
     for node in content.children:
         case node.kind
+        of nnkAsgn:
+            if node[0].kind != nnkIdent:
+                quit_unexpected(node[0], "token (expected ident)", node[0].kind)
+            var
+                curClass = context.cur_class.parent
+                foundVar = false
+            while curClass != nil:
+                for identDef in curClass.params.children:
+                    if $node[0].ident == identDef[0].ident_name:
+                        foundVar = true
+                        break
+            if foundVar:
+                renderBody.add(newAssignment(newNimNode(nnkDotExpr).add(
+                        context.global_syms.obj, node[0]),
+                        copy_tree_replace_params(context, node[1])))
         of nnkPragma:
             process_pragma(nil, node[0], context)
         of nnkCommand:
@@ -209,12 +245,17 @@ proc process_block_replacements(content: NimNode,
                     quit_unknown(node[1], "block name", blockName)
                 else:
                     var targetCotext: ParseContext = methodContext.copy()
+                    
+                    var childMethodContext = methodContext.copy()
+                    childMethodContext.cur_class = context.cur_class
+                    childMethodContext.debug = context.debug
+                    childMethodContext.class_instance = context.class_instance
             
                     targetCotext.adapt_to_child_class(context)
             
                     let streamName = genSym(nskParam, ":stream")
                     var procContent = write_proc_content(streamName, node[2],
-                                                         methodContext)
+                                                         childMethodContext)
                     if node[0].ident_name == "append":
                         procContent.insert(0, newNimNode(nnkCommand).add(
                                 ident("procCall"), newCall(baseMethodName,
@@ -259,11 +300,11 @@ macro html_templ*(arg1: expr, arg2: expr = nil): stmt =
     
     var parentClass: TemplateClass = nil
     if parent != nil:
-        if parent.kind != nnkCall:
+        if parent.kind != nnkIdent:
             quit_unexpected(parent, "html_templ parameter (expected call)",
                     parent.kind)
         for class in templateClasses:
-            if class.name == ":class-" & $(parent[0].ident_name):
+            if class.name == parent.ident_name:
                 parentClass = class
                 break
         if parentClass == nil:
@@ -278,15 +319,28 @@ macro html_templ*(arg1: expr, arg2: expr = nil): stmt =
 
     # define a class type for the template object
     let
-        className = genSym(nskType, ":class-" & content[0].ident_name)        
+        className = genSym(nskType, content[0].ident_name)        
         streamName = genSym(nskParam, ":stream")
         objName = genSym(nskParam, ":obj")
+    var
+        recList = if content[3].len > 0: newNimNode(nnkRecList) else:
+                newEmptyNode()
+    for identDef in content[3].children:
+        if identDef.kind == nnkIdentDefs:
+            if content[0].kind == nnkPostfix:
+                recList.add(newIdentDefs(newNimNode(nnkPostfix).add(ident("*"),
+                        identDef[0]), identDef[1], identDef[2]))
+            else:
+                recList.add(copyNimTree(identDef))
+        elif identDef.kind != nnkEmpty:
+            quit_unexpected(identDef, "parameter kind", $identDef.kind)
+    
     result = newStmtList(newNimNode(nnkTypeSection).add(
         newNimNode(nnkTypeDef).add(if content[0].kind == nnkPostfix:
         newNimNode(nnkPostfix).add(ident("*"), className) else: className,
         newEmptyNode(), newNimNode(nnkRefTy).add(newNimNode(nnkObjectTy).add(
         newEmptyNode(), newNimNode(nnkOfInherit).add(if parent == nil: ident(
-        "RootObj") else: parentClass.symbol), newEmptyNode()
+        "RootObj") else: parentClass.symbol), recList
     )))))
     
     # define render method
@@ -294,42 +348,44 @@ macro html_templ*(arg1: expr, arg2: expr = nil): stmt =
         templClass = newTemplateClass(className, parentClass)
         context = newContext(result, templClass, objName,
                 content[0].kind == nnkPostfix)
-        formalParams = newNimNode(nnkFormalParams).add(newEmptyNode(),
-            newIdentDefs(objName, className),
-            newIdentDefs(streamName, ident("Stream"))
-        )
+    
     for identDef in content[3].children:
         if identDef.kind != nnkEmpty:
-            formalParams.add(copyNimTree(identDef))
             templClass.add_param(copyNimTree(identDef))
     templateClasses.add(templClass)
-    let renderName = if content[0].kind == nnkPostfix: newNimNode(nnkPostfix
+    let
+        renderName = if content[0].kind == nnkPostfix: newNimNode(nnkPostfix
             ).add(ident("*"), ident("render")) else: ident("render")
+        formalParams = newNimNode(nnkFormalParams).add(newEmptyNode(),
+                newIdentDefs(objName, className),
+                newIdentDefs(streamName, ident("Stream"))
+        )
     
     var stmts: NimNode
     if parentClass == nil:
         stmts = write_proc_content(streamName, content[6], context)
     else:
+        stmts = newStmtList()
         var call = newCall(ident("render"),
                 newCall(parentClass.symbol, objName), streamName)
         for i in 1 .. (parent.len - 1):
             call.add(parent[i])
-        stmts = newNimNode(nnkCommand).add(ident("procCall"), call)
-        
-        process_block_replacements(content[6], context)
+        process_block_replacements(content[6], context, stmts)
+        stmts.add(newNimNode(nnkCommand).add(ident("procCall"), call))
+    
+    # add new… proc
+    result.add(newProc(if content[0].kind == nnkPostfix:
+            newNimNode(nnkPostfix).add(ident("*"),
+            ident("new" & capitalize(content[0].ident_name))) else:
+            ident("new" & capitalize(content[0].ident_name)),
+            [className],
+            newStmtList(newCall("new", ident("result")))))
     
     # add render proc
     result.add(newNimNode(nnkProcDef).add(renderName,
         newEmptyNode(), newEmptyNode(), formalParams, newEmptyNode(),
         newEmptyNode(), stmts
     ))
-    
-    # define template object
-    result.add(newNimNode(nnkLetSection).add(newIdentDefs(
-        if content[0].kind == nnkPostfix: newNimNode(nnkPostfix).add(ident("*"),
-        ident(content[0].ident_name)) else: ident(content[0].ident_name),
-        newEmptyNode(), newCall(className)
-    )))
     
     if context.debug:
         echo repr(result)
@@ -492,10 +548,10 @@ proc copy_node_parse_children(writer: StmtListWriter, context: ParseContext,
             if child.kind == nnkStmtList:
                 parse_children(childWriter, context, child)
             else:
-                result.add(copyNimTree(child))
+                result.add(copy_tree_replace_params(context, child))
         result.add(childWriter.result)
     else:
-        result = copyNimTree(node)
+        result = copy_tree_replace_params(context, node)
 
 proc parse_children(writer: StmtListWriter, context: ParseContext,
                     content: NimNode) =
@@ -529,7 +585,8 @@ proc parse_children(writer: StmtListWriter, context: ParseContext,
         of nnkIdent:
             if context.mode == unknown:
                 context.mode = flowmode
-            writer.add_filtered(newNimNode(nnkPrefix).add(ident("$"), node))
+            writer.add_filtered(newNimNode(nnkPrefix).add(ident("$"),
+                    copy_tree_replace_params(context, node)))
         of nnkIfStmt, nnkWhenStmt, nnkCaseStmt:
             var ifNode = newNimNode(node.kind, node)
             for ifBranch in node.children:
@@ -539,7 +596,7 @@ proc parse_children(writer: StmtListWriter, context: ParseContext,
             writer.addNode(copy_node_parse_children(writer, context, node))
         of nnkAsgn, nnkVarSection, nnkConstSection, nnkLetSection,
                 nnkDiscardStmt:
-            writer.addNode(copyNimTree(node))
+            writer.addNode(copy_tree_replace_params(context, node))
         of nnkBlockStmt:
             if node[0].kind == nnkEmpty:
                 quit_missing(node[0], "block name")
@@ -583,7 +640,7 @@ proc parse_children(writer: StmtListWriter, context: ParseContext,
             case node[0].ident_name
             of "call":
                 for i in 1..(node.len - 1):
-                    writer.add_node(copyNimTree(node[i]))
+                    writer.add_node(copy_tree_replace_params(context, node[i]))
             of "put":
                 for i in 1..(node.len - 1):
                     if node[i].kind == nnkCall and
@@ -614,7 +671,8 @@ proc parse_children(writer: StmtListWriter, context: ParseContext,
                         writer.add_node(newCall(callbackSym,
                                 writer.target_stream()))
                     else:
-                        writer.add_filtered(copyNimTree(node[i]))
+                        writer.add_filtered(copy_tree_replace_params(context,
+                                node[i]))
             of "call_mixin":
                 # if we just directly paste the parsed mixin code here, all
                 # symbols that are visible here are visible in the mixin. we

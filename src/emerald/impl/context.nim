@@ -273,8 +273,15 @@ proc `debug=`*(context: ParseContext, val: bool) {.compileTime.} =
 
 proc public*(context: ParseContext): bool {. compileTime.} = context.isPublic
 
-proc global_syms*(context: ParseContext): tuple[class: NimNode, obj: NimNode] =
+proc global_syms*(context: ParseContext): tuple[class: NimNode, obj: NimNode]
+        {.compileTime.} =
     (class: context.class.sym, obj: context.objName)
+
+proc class_instance*(context: ParseContext): NimNode {.compileTime.} =
+    context.objName
+
+proc `class_instance=`*(context: ParseContext, val: NimNode) {.compileTime.} =
+    context.objName = val
 
 proc cur_class*(context: ParseContext): TemplateClass = context.class
 
