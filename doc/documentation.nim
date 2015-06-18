@@ -10,8 +10,8 @@ layout.sites.add((title: "Documentation", url: "documentation.html",
                              ("Pragmas", "pragmas"), ("Filters", "filters"),
                              ("Template inheritance", "inheritance")]))
 
-proc doc*(sites: seq[site])
-    {. html_templ: layout("Documentation", sites) .} =
+proc doc*() {. html_templ: layout .} =
+    title = "Documentation"
     replace content:
         h1: "Documentation"
         section:
@@ -42,9 +42,13 @@ proc doc*(sites: seq[site])
                 {. filters = pygmentize("nim") .}
                 {. preserve_whitespace = true .}
                 """
-let templ = templ_class()
+type templ = ref object of RootObj
+    param: string
 
-proc render(obj: templ_class, s: Stream, param: string) =
+proc newTempl(): templ =
+    new(result)
+
+proc render(obj: templ_class, s: Stream) =
     #...
 """
                 {. filters = escape_html() .}
@@ -53,8 +57,13 @@ proc render(obj: templ_class, s: Stream, param: string) =
             figure:
                 {. filters = pygmentize("nim") .}
                 {. preserve_whitespace = true .}
-                "var ss = newStringStream()\ntempl.render(ss, \"foo\")"
-
+                """
+var
+    ss = newStringStream()
+    myTempl = newTempl()
+templ.param = "foo"
+templ.render(ss)
+"""
                 {. filters = escape_html() .}
                 {. preserve_whitespace = false .}
                 figcaption: "... and how to use it in your code."
@@ -518,8 +527,9 @@ proc parent(title: string,
                 a(href=homeUrl): title
             block content: discard
 
-proc home(homeUrl: string)
-        {. html_templ: parent("Home", homeUrl) .} =
+proc home()
+        {. html_templ: parent .} =
+    title = "Home"
     replace content:
         p: "Content"
 """
@@ -530,23 +540,23 @@ proc home(homeUrl: string)
             h2(id="inheritance"): "Template Inheritance"
             p:
                 """You can inherit from templates by specifying the parent
-                template when declaring the child template. When inheriting, you
-                need to specify a value for each non-optional parameter of the
-                parent template. You may use parameters of the child template to
-                set these values."""
+                template when declaring the child template. This will make the
+                generated object type of the child template inherit from the
+                object type of the parent template."""
             p:
                 """In any template that inherits from another template, you
                 cannot have HTML tags or text content nodes on the root level.
-                Insead, you can specify the following commands:"""
-                code("prepend"); ", "; code("replace"); " and "; code("append")
-                """. Each of these takes one argument and must have a child
-                block. The argument must be the name of a block in any parent
-                template (does not need to be the immediate parent)."""
-                code("prepend"); """ will add its content before the content of
-                the block in the parent template, """; code("replace")
-                """ will completely replace the content of the block, and """
-                code("append"); """ will append its content to the block in
-                the parent template."""
+                However, you can assign values to the parent template's
+                parameters. For adding content, you use the following commands:
+                """; code("prepend"); ", "; code("replace"); " and ";
+                code("append"); """. Each of these takes one argument and must
+                have a child block. The argument must be the name of a block in
+                any parent template (does not need to be the immediate parent).
+                """; code("prepend"); """ will add its content before the
+                content of the block in the parent template, """
+                code("replace"); """ will completely replace the content of the
+                block, and """; code("append"); """ will append its content to
+                the block in the parent template."""
             p:
                 """Blocks must always have names in templates. You may still use
                 them for scoping variables as you can do it in Nim, but be aware

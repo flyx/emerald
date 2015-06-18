@@ -41,9 +41,15 @@ proc child_without_additional_params() {. html_templ: base_with_params .} =
 
 proc child_with_additional_params(content: string)
         {. html_templ: base_with_params .} =
-    {. debug = true .}
     replace content:
         p: content
+
+proc setting_parent_params_in_child() {.html_templ: base_with_params.} =
+    {.debug=true.}
+    title = "MyTitle"
+    num = 3
+    replace content:
+        p: "Content"
 
 suite "inheritance":
     test "base template with block":
@@ -106,3 +112,11 @@ suite "inheritance":
         templ.render(ss)
         ss.flush()
         check ss.data == """<head><title>Titel 2</title></head><body><ul><li>1</li></ul><p>Mimimi</p></body>"""
+    
+    test "setting parent parameters in child template":
+        var
+            ss = newStringStream()
+            templ = newSettingParentParamsInChild()
+        templ.render(ss)
+        ss.flush()
+        check ss.data == """<head><title>MyTitle</title></head><body><ul><li>1</li><li>2</li><li>3</li></ul><p>Content</p></body>"""

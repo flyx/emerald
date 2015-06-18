@@ -4,8 +4,8 @@ import layout
 
 layout.sites.add((title: "Home", url: "home.html", anchors: @[]))
 
-proc home*(sites: seq[site])
-        {. html_templ: layout("Home", sites) .} =
+proc home*() {. html_templ: layout .} =
+    title = "Home"
     {. debug = true .}
     replace content:
         p:

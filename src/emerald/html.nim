@@ -157,9 +157,10 @@ proc process_pragma(writer: OptionalStmtListWriter, node: NimNode,
     else:
         quit_invalid(node, "pragma content", $node.kind)
 
-proc copy_tree_replace_params(context: ParseContext, node: NimNode): NimNode
+proc copy_tree_replace_params(context: ParseContext, node: NimNode,
+            keepThisIdent: bool = false): NimNode
         {.compileTime.} =
-    if node.kind == nnkIdent:
+    if node.kind == nnkIdent and not keepThisIdent:
         var isTemplParam = false
         block searchForParam:
             var class = context.cur_class
@@ -175,8 +176,11 @@ proc copy_tree_replace_params(context: ParseContext, node: NimNode): NimNode
             result = node
     else:
         result = copyNimNode(node)
+        var first = true
         for child in node.children:
-            result.add(copy_tree_replace_params(context, child))
+            result.add(copy_tree_replace_params(context, child,
+                    node.kind == nnkDotExpr and not first))
+            first = false
 
 proc process_block_replacements(content: NimNode,
         context: ParseContext, renderBody: NimNode) {.compileTime.} =
@@ -193,6 +197,7 @@ proc process_block_replacements(content: NimNode,
                     if $node[0].ident == identDef[0].ident_name:
                         foundVar = true
                         break
+                curClass = curClass.parent
             if foundVar:
                 renderBody.add(newAssignment(newNimNode(nnkDotExpr).add(
                         context.global_syms.obj, node[0]),
@@ -301,7 +306,7 @@ macro html_templ*(arg1: expr, arg2: expr = nil): stmt =
     var parentClass: TemplateClass = nil
     if parent != nil:
         if parent.kind != nnkIdent:
-            quit_unexpected(parent, "html_templ parameter (expected call)",
+            quit_unexpected(parent, "html_templ parameter (expected ident)",
                     parent.kind)
         for class in templateClasses:
             if class.name == parent.ident_name:
@@ -467,7 +472,7 @@ proc parse_tag(writer: StmtListWriter, context: ParseContext,
             if directContent != nil:
                 quit_duplicate(node[i], "direct content", $node[i].kind)
             else:
-                directContent = node[i]
+                directContent = copy_tree_replace_params(context, node[i])
         of nnkExprEqExpr:
             if not (node[i][0].kind in [nnkIdent, nnkAccQuoted]):
                 quit_unexpected(node[i][0], "token", node[i][0].kind)
@@ -478,14 +483,16 @@ proc parse_tag(writer: StmtListWriter, context: ParseContext,
                 if classes.len > 0:
                     writer.add_attr_val(attrName, newNimNode(
                             nnkInfix).add(ident("&"),
-                            newStrLitNode(classes & ' '), node[i][1]))
+                            newStrLitNode(classes & ' '),
+                            copy_tree_replace_params(context, node[i][1])))
                     added = true
                     classes = ""
             if not added:
                 if is_bool_attr(attrName):
                     writer.add_bool_attr(attrName, node[i][1])
                 else:
-                    writer.add_attr_val(attrName, node[i][1])
+                    writer.add_attr_val(attrName,
+                            copy_tree_replace_params(context, node[i][1]))
             
             if attrName in required_attrs:
                 required_attrs.excl(attrName)

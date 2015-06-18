@@ -4,8 +4,8 @@ import layout
 
 layout.sites.add((title: "Tutorial", url: "tutorial.html", anchors: @[]))
 
-proc tut*(sites: seq[site])
-    {. html_templ: layout("Tutorial", sites) .} =
+proc tut*() {. html_templ: layout .} =
+    title = "Tutorial"
     replace content:
         h1: "Tutorial"
         section:
@@ -196,8 +196,11 @@ proc templ(numItems: int) {.html_templ.} =
                 {. filters = pygmentize("nim") .}
                 {. preserve_whitespace = true .}
                 """
-var ss = newStringStream()
-templ.render(ss)
+var
+    ss = newStringStream()
+    myTempl = newTempl()
+myTempl.numItems = 3
+myTempl.render(ss)
 """
 
                 {. filters = escape_html() .}
@@ -207,12 +210,14 @@ templ.render(ss)
             h2: "3. Call your templates"
             p:
                 """While you write your template as proc, it isn't a proc
-                anymore after emerald has parsed it. Instead, a variable is
-                available on which you can call a proc called """
-                code("render"); ". This proc always takes a "; code("Stream ")
-                """as first argument, and any parameters you defined for your
-                template as additional parameters. When calling """
-                code("render")
+                anymore after emerald has parsed it. Instead, it is an object
+                type. You can create a new instance with """;
+                code("new[Name]()"); """. This proc never takes parameters. The
+                parameters you declared for the template are settable as object
+                values. You can render the template by calling the object's """
+                code("render"); " proc. This proc takes a "; code("Stream")
+                """as second parameter after the template instance. When
+                calling """; code("render")
                 """, the template will be rendered into the given stream."""
             p:
                 """This concludes the tutorial. For a more detailed
