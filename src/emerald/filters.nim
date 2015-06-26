@@ -2,8 +2,8 @@ import streams, strtabs, osproc
 import packages.docutils.rstgen
 import packages.docutils.rst
 
-proc escape_html*(target: Stream, value : string,
-                 escapeQuotes: bool = false) =
+proc escape_html*(target: Stream, value: string,
+                  escapeQuotes: bool = false) =
     ## translates the characters `&`, `<` and `>` to their corresponding
     ## HTML entities. if `escapeQuotes` is `true`, also translates
     ## `"` and `'`.

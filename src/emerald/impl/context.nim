@@ -236,10 +236,10 @@ proc indentation*(context: ParseContext): string {.compileTime.} =
 proc `indent_step=`*(context: ParseContext, val: int) {.compileTime.} =
     curLevel.indentStep = val
 
-proc compact_output*(context: ParseContext): bool {.compileTime.} =
-    context.compactOutput
+proc compact*(context: ParseContext): bool {.compileTime.} =
+    curLevel.compactOutput
 
-proc `compact_output=`*(context: ParseContext, val: bool) {.compileTime.} =
+proc `compact=`*(context: ParseContext, val: bool) {.compileTime.} =
     curLevel.compactOutput = val
 
 proc preserve_whitespace*(context: ParseContext): bool {.compileTime.} =

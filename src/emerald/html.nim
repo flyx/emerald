@@ -115,7 +115,7 @@ proc process_pragma(writer: OptionalStmtListWriter, node: NimNode,
     of nnkExprEqExpr:
         case $node[0].ident
         of "compact_mode":
-            context.compact_output = bool_from_ident(node[1])
+            context.compact = bool_from_ident(node[1])
         of "indent_step":
             let length = int_from_lit(node[1])
             if length < 0:
@@ -127,6 +127,8 @@ proc process_pragma(writer: OptionalStmtListWriter, node: NimNode,
                 add_filters(result, node[1], context)
                 context.filters = result
                 if context.preserve_whitespace:
+                    writer.filters = context.filters
+                elif context.compact:
                     writer.filters = context.filters
                 else:
                     writer.filters = context.filters &
@@ -142,7 +144,7 @@ proc process_pragma(writer: OptionalStmtListWriter, node: NimNode,
                 let pw = bool_from_ident(node[1])
                 if pw != context.preserve_whitespace:
                     context.preserve_whitespace = pw
-                    if pw:
+                    if pw or context.compact:
                         writer.filters = context.filters
                     else:
                         writer.filters = context.filters &
@@ -391,14 +393,6 @@ macro html_templ*(arg1: expr, arg2: expr = nil): stmt =
         newEmptyNode(), newEmptyNode(), formalParams, newEmptyNode(),
         newEmptyNode(), stmts
     ))
-    
-    if context.debug:
-        echo repr(result)
-        echo "====CLASSES===="
-        for templ in templateClasses:
-            echo templ.name
-            for m in templ.methods:
-                echo "  " & m.name
 
 proc first_ident(node: NimNode): string {.compileTime.} =
     var leaf = node
@@ -526,8 +520,9 @@ proc parse_tag(writer: StmtListWriter, context: ParseContext,
                     "already has direct content")
         writer.add_literal(">")
         context.enter(tag)
-        writer.filters = context.filters & newCall("change_indentation",
-                newStrLitNode(context.indentation))
+        if not context.compact:
+            writer.filters = context.filters & newCall("change_indentation",
+                    newStrLitNode(context.indentation))
         parse_children(writer, context, node[node.len - 1])
         let finishInBlockMode = context.mode == blockmode
         context.exit()

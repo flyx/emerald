@@ -413,7 +413,7 @@ proc templ() {.html_templ.} =
             {. filters = nil .}
             "<title>Title</title>"
         body:
-            # escape_html is active hear, because
+            # escape_html is active here, because
             # we left the tag "head"
             
             d:
@@ -468,7 +468,9 @@ proc foo() =
                     ", "; code("\""); " and "; code("'")
                     " are escaped as well."
                 dt:
-                    code("rst(options: TRstParseOptions = {}, config: StringTableRef = newStringTable())")
+                    code:
+                        """rst(options: TRstParseOptions = {},
+                         config: StringTableRef = newStringTable())"""
                 dd:
                     """Parses the input as RST, using Nim's internal RST
                     implementation. Be aware that the resulting HTML is not
@@ -527,8 +529,7 @@ proc parent(title: string,
                 a(href=homeUrl): title
             block content: discard
 
-proc home()
-        {. html_templ: parent .} =
+proc home() {. html_templ: parent .} =
     title = "Home"
     replace content:
         p: "Content"
@@ -552,7 +553,7 @@ proc home()
                 code("append"); """. Each of these takes one argument and must
                 have a child block. The argument must be the name of a block in
                 any parent template (does not need to be the immediate parent).
-                """; code("prepend"); """ will add its content before the
+                """; code(" prepend"); """ will add its content before the
                 content of the block in the parent template, """
                 code("replace"); """ will completely replace the content of the
                 block, and """; code("append"); """ will append its content to

@@ -46,21 +46,16 @@ proc add_filtered_node(writer: StmtListWriter, node: NimNode) {.compileTime.} =
             if i == writer.curFilters.len - 1:
                 call.add(copyNimTree(writer.streamIdent))
             else:
-                #writer.output.add(newAssignment(newNimNode(nnkDotExpr).add(
-                #        if i mod 2 == 0: writer.cache1 else: writer.cache2,
-                #        ident("data")), newStrLitNode("")))
-                #writer.output.add(newCall(newNimNode(nnkDotExpr).add(
-                #        if i mod 2 == 0: writer.cache1 else: writer.cache2,
-                #        ident("setPosition")),  newIntLitNode(0)))
-                # TODO: try to avoid allocating memory here.
-                #       commented code above does not work.
-                writer.output.add(newAssignment(if i mod 2 == 0:
-                        writer.cache1 else: writer.cache2, newCall(
-                        "newStringStream")))
+                writer.output.add(newCall(newNimNode(nnkDotExpr).add(
+                        if i mod 2 == 0: writer.cache1 else: writer.cache2,
+                            ident("setPosition")),  newIntLitNode(0)))
                 call.add(if i mod 2 == 0: writer.cache1 else: writer.cache2)
-            call.add(if i == 0: node else: newNimNode(nnkDotExpr).add(
-                    if i mod 2 == 0: writer.cache2 else: writer.cache1,
-                    ident("data")))
+            call.add(if i == 0: node else: newCall("substr",
+                    newNimNode(nnkDotExpr).add(if i mod 2 == 0: writer.cache2
+                    else: writer.cache1, ident("data")), newIntLitNode(0),
+                    newNimNode(nnkInfix).add(ident("-"), newCall("getPosition",
+                    if i mod 2 == 0: writer.cache2 else: writer.cache1),
+                    newIntLitNode(1))))
             for p in 1..writer.curFilters[i].len - 1:
                 call.add(writer.curFilters[i][p])
             writer.output.add(call)

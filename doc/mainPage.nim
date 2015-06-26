@@ -6,7 +6,6 @@ layout.sites.add((title: "Home", url: "home.html", anchors: @[]))
 
 proc home*() {. html_templ: layout .} =
     title = "Home"
-    {. debug = true .}
     replace content:
         section:
             h2: "About"
