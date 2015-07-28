@@ -1,8 +1,17 @@
-import unittest
+import unittest, strutils
 
 include ../src/emerald
 
 import basics_publicTemplate
+
+proc diff(actual, expected: string): bool =
+    result = actual.len == expected.len
+    for i in 0 .. min(actual.len, expected.len) - 1:
+        if actual[i] != expected[i]:
+            echo "difference at $1: $2 != $3" % [$i, $actual[i], $expected[i]]
+            result = false
+    if not result:
+        echo "expected:\n$1\n\nactual:\n$2" % [expected, actual]
 
 proc base() {.html_templ.} =
     html(lang="en"):
@@ -53,7 +62,7 @@ suite "basics":
             templ = newBase()
         templ.render(ss)
         ss.flush()
-        check ss.data == """<!DOCTYPE html>
+        check diff(ss.data, """<!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
     <head>
         <title>Basics</title>
@@ -62,7 +71,7 @@ suite "basics":
         <p>Content</p>
     </body>
 </html>
-"""
+""")
 
     test "basic template with parameters":
         var
@@ -72,7 +81,8 @@ suite "basics":
         templ.content = false
         templ.render(ss)
         ss.flush()
-        check ss.data == """<!DOCTYPE html>
+        check diff(ss.data, """
+<!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
     <head>
         <title>T1</title>
@@ -81,13 +91,15 @@ suite "basics":
         <h1>Heading</h1>
     </body>
 </html>
-"""
+""")
+
         ss = newStringStream()
         templ.title = "T2"
         templ.content = true
         templ.render(ss)
         ss.flush()
-        check ss.data == """<!DOCTYPE html>
+        check diff(ss.data, """
+<!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
     <head>
         <title>T2</title>
@@ -97,7 +109,7 @@ suite "basics":
         <p>Content</p>
     </body>
 </html>
-"""
+""")
 
     test "tag classes":
         var

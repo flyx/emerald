@@ -1,9 +1,9 @@
 import macros, sets, streams, tables, strutils
 
-import impl/writer
-import impl/context
-import impl/html5
-import impl/tagdef
+import private/writer
+import private/context
+import private/html5
+import private/tagdef
 import filters
 
 template quit_unknown[T](node: NimNode, what: string, val: T) =
@@ -438,13 +438,18 @@ proc parse_tag(writer: StmtListWriter, context: ParseContext,
     else:
         writer.add_literal("<" & name)
     
-    var mappedInjectedAttrs = initTable[string, string]()
+    var mappedInjectedAttrs = initTable[string, seq[string]]()
     for injectedAttr in injected_attrs(tag.id):
         case injectedAttr.val.kind
         of nnkStrLit:
             writer.add_attr_val(injectedAttr.name, injectedAttr.val.strVal)
         of nnkIdent:
-            mappedInjectedAttrs[$injectedAttr.val.ident] = injectedAttr.name
+            let identName = $injectedAttr.val.ident
+            if mappedInjectedAttrs.hasKey(identName):
+                mappedInjectedAttrs[identName] =
+                    mappedInjectedAttrs[identName] & injectedAttr.name
+            else:
+                mappedInjectedAttrs[$injectedAttr.val.ident] = @[injectedAttr.name]
         else:
             quit "Error in tagdef!"
     
@@ -498,11 +503,12 @@ proc parse_tag(writer: StmtListWriter, context: ParseContext,
             
             if mappedInjectedAttrs.hasKey(attrName):
                 if is_bool_attr(attrName):
-                    writer.add_bool_attr(mappedInjectedAttrs[attrName],
-                            node[i][1])
+                    for targetAttr in mappedInjectedAttrs[attrName]:
+                        writer.add_bool_attr(targetAttr, node[i][1])
                 else:
-                    writer.add_attr_val(mappedInjectedAttrs[attrName],
-                            node[i][1])
+                    for targetAttr in mappedInjectedAttrs[attrName]:
+                        writer.add_attr_val(targetAttr, node[i][1])
+                           
         else:
             quit_unexpected(node[i], "token [2]", node[i].kind)
     if classes.len > 0:
