@@ -235,7 +235,6 @@ proc process_block_replacements(content: NimNode,
                 # search for the method we override
                 var
                     curClass = class.parent
-                    nearestClass: NimNode = nil
                     methodName: NimNode = nil
                     baseMethodName: NimNode = nil
                     methodContext: OptionalParseContext = nil

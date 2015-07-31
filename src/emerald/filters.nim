@@ -54,7 +54,7 @@ proc change_indentation*(target: Stream, value: string,
                 in_indentation = false
             target.write(c)
 
-proc rst*(target: Stream, value: string, options: TRstParseOptions = {},
+proc rst*(target: Stream, value: string, options: RstParseOptions = {},
          config: StringTableRef = newStringTable()) =
     target.write(rstToHtml(value, options, config))
 
