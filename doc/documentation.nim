@@ -48,7 +48,7 @@ type templ = ref object of RootObj
 proc newTempl(): templ =
     new(result)
 
-proc render(obj: templ_class, s: Stream) =
+method render(obj: templ_class, s: Stream) =
     #...
 """
                 {. filters = escape_html() .}
@@ -80,27 +80,21 @@ templ.render(ss)
                 """This macro can only be applied to a proc. This proc may not
                 have a return type and may be publicly exposed (via """
                 code("*"); """) or private. The whole content of the proc will
-                be parsed as HTML template. Parsing will create a """
-                code("let"); """ variable with the name of the parsed proc, so
-                if you have a proc called """; code("templ")
-                ", you will have a "; code("let"); " variable named "
-                code("templ"); "."
+                be parsed as HTML template. Parsing will convert the proc into
+                an object type with the same name, a constructor proc for this
+                type, and a method named """; code("render()")
+                " that operates on this type. This is shown in the example code."
             p:
-                """"The template code is written into a proc named """
-                code("render"); """, which takes the """; code("let")
-                """ variable as first parameter and a """; code("Stream")
-                """ as second parameter. After those parameters, the parameters
-                you defined on the original template proc follow. The """
-                code("render"); " proc and the "; code("let"); """ variable will
-                have the same visibility as the original proc, so you can have
-                private and public templates."""
+                "The "; code("render"); """ method takes an instance of the 
+                template object as first parameter and a """; code("Stream")
+                """ as second parameter. The object type, the constructor proc
+                and the render method will have the same visibility as the
+                original proc, so you can have private and public templates."""
             p:
-                "The example shows a type name "; code("templ_class"); """. This
-                is not the actual name of the generated type; you will never
-                need to use this name in your code nor are you able to, because
-                it's created with """; code("genSym"); """. The type does not
-                have any content, it is only used for implementing """
-                a(href="#inheritance", "template inheritance"); "."
+                """All parameters of the original proc will be transformed into
+                fields of the resulting object type. This enables you to re-use
+                an object instance multiple times without needing to specify all
+                parameters each time."""
             h3: code("html_mixin")
             figure:
                 {. filters = pygmentize("nim") .}
@@ -136,8 +130,8 @@ proc templ() {.html_templ.} =
                 parameter; you have to give all parameters you defined for the
                 mixin there. You can also give a block as second parameter, in
                 which case this block can be called from within the mixin by
-                calling """; code("mixin_content()"); ". If you  call "
-                code("mixin_content()"); """ in the mixin code, but you don't
+                calling """; code("mixin_content()"); ". If you call "
+                code("mixin_content()"); """ in the mixin code, but do not
                 supply a block as parameter in the template where you call the
                 mixin, emerald will exit with an error message."""
         section:
@@ -212,7 +206,7 @@ proc templ() {.html_templ.} =
                 code("xml:lang"); """, which is necessary for valid XHTML. That
                 does not mean that you must start every template with an """
                 code("html"); """ tag - it is perfectly fine to write templates
-                which only generate a part of a compile HTML DOM-tree. You would
+                which only generate a part of an HTML DOM-tree. You would
                 use such templates e.g. for AJAX-based websites."""
         section:
             figure:
@@ -357,43 +351,48 @@ proc templ() {.html_templ.} =
             p:
                 """You can modify the way emerald compiles your template by
                 using pragmas. Pragmas use the usual Nim syntax """
-                code("{. pragma here .}"); """. emerald supports the following
-                pragmas:"""
+                code: "{. "; em("pragma here"); " .}"
+                """. emerald supports the following pragmas:"""
             dl:
                 dt:
                     code: "{. compact_mode = "; em("val"); " .}"
                 dd:
-                    """ Toggles whether the generated HTML should be written
+                    """Toggles whether the generated HTML should be written
                     in human-readable form with newlines and indentation, or as
-                    compact as possible without any unnecessary whitespace."""
+                    compact as possible without any unnecessary whitespace. """
                     em("val"); " may be either "; code("true"); " or "
                     code("false"); ", default value is "; code("false"); "."
                     
                 dt:
                     code: "{. indent_step = "; em("val"); " .}"
                 dd:
-                    """ Sets the amount of spaces added to every new level of
+                    """Sets the amount of spaces added to every new level of
                     indentation. """; em("val"); """ may be any non-negative
-                    integer value. default is """; code("4")
+                    integer value. default is """; code("4"); "."
                 dt:
                     code: "{. preserve_whitespace = "; em("val"); " .}"
                 dd:
-                    """ Sets whether the lines of generated text content will
+                    """Defines whether the lines of generated text content will
                     be indented to the current output indentation, removing any
                     existing indentation. """; em("val"); " may be "
                     code("true"); " or "; code("false"); ", default is "
-                    code("false"); "."
+                    code("false"); "."; "If "; code("true"); """, the existing
+                    whitespace at the beginning of each line for text output
+                    will be preserved and no indentation will be applied (
+                    regardless of the value of """; code("compact_mode")
+                    """. This is useful when inserting source code or anything
+                    similar in your HTML page."""
                 dt:
                     code: "{. debug = "; em("val"); " .}"
                 dd:
-                    """ Enables or disables debugging output. If enabled,
-                    emerald will output the generated AST as nimrod code to
+                    """Enables or disables debugging output. If enabled,
+                    emerald will output the generated AST as Nim code to
                     stdout. """; em("val"); " may be "; code("true"); " or "
                     code("false"); ", default is "; code("false"); "."
                 dt:
                     code: "{. filters = "; em("filter_chain"); " .}"
                 dd:
-                    """ This pragma manipulates the filter chain and is 
+                    """This pragma manipulates the filter chain and is 
                     described in detail in the next section."""
             p:
                 "Apart from "; code("debug"); """, all pragmas are applied to

@@ -17,7 +17,7 @@ proc tut*() {. html_templ: layout .} =
             d.highlight: pre: "$ nimble install emerald"
             p: """Now using emerald consists of three simple steps:"""
             ol:
-                li: "Include "; code("emerald "); "in your code."
+                li: "Include "; code("emerald"); " in your code."
                 li: "Write templates"
                 li: "Call your templates"
             p: "Sounds easy enough, doesn't it? Let's look at the details."
@@ -32,13 +32,13 @@ proc tut*() {. html_templ: layout .} =
                 figcaption: "include it."
             h2: "1. Include "; code("emerald")
             p:
-                "The "; code("emerald "); """module contains imports, and only
+                "The "; code("emerald"); """ module contains imports, and only
                 imports, of everything you need to use emerald: The """
-                code("streams "); """module from the standard library, and the
-                emerald modules """; code("html "); "and "; code("filters")
+                code("streams"); """ module from the standard library, and the
+                emerald modules """; code("html"); " and "; code("filters")
                 """. You could also import them directly, but as the list of
-                imprts you need may change, including emerald is the safest
-                way."""
+                imports you need may change, including """; code("emerald")
+                " is the safest way."
         section:
             figure:
                 {. filters = pygmentize("nim") .}
@@ -60,8 +60,8 @@ proc templ(pageTitle: string) {.html_templ.} =
                 """You start writing a template with a proc header. The name
                 of the proc is the name of your template. The template may take
                 any number of parameters and may not have a return value. Then,
-                you apply the macro """; code("html_templ ")
-                """To it. This macro is provided by emerald and will parse
+                you apply the macro """; code("html_templ")
+                """ to it. This macro is provided by emerald and will parse
                 the body of the proc as html template."""
             p:
                 """In the body, every call that is a statement is interpreted as
@@ -93,9 +93,9 @@ proc templ(numItems: int) {.html_templ.} =
                 {. preserve_whitespace = false .}
                 figcaption: "use variables and control structures."
             p:
-                "You can use "; code("if"); ", "; code("case "); "and " 
-                code("for "); """loops inside templates. You can also define and
-                use variables with """; code("var"); ", "; code("let "); "and "
+                "You can use "; code("if"); ", "; code("case"); " and " 
+                code("for"); """ loops inside templates. You can also define and
+                use variables with """; code("var"); ", "; code("let"); " and "
                 code("const"); """. Every expression that stands alone on a line
                 and is not a call will be transformed to a string and written to
                 the output HTML. By default, all string output will be filtered
@@ -108,8 +108,8 @@ proc templ(numItems: int) {.html_templ.} =
                 but it throws errors when you try to use HTML tags at places
                 where they are forbidden, or if you forget to set required
                 attributes. By the way, attributes can be set as named
-                parameters, as you can see on the """; code("html ")
-                """element in the example. Instead of the string, you can
+                parameters, as you can see on the """; code("html")
+                """ element in the example. Instead of the string, you can
                 use any expression to define the attribute's value. Some HTML
                 attributes have names that are also keywords in Nim. When you
                 set them, you need to use backticks around the name (e.g. """
@@ -142,8 +142,8 @@ proc templ(numItems: int) {.html_templ.} =
                 business logic in your template, you shouldn't embed program
                 logic in the template unless it's absolutely necessary. Other
                 templating engines like e.g. """
-                a(href="http://mustache.github.io", "mustache ")
-                """forbid you by design to embed any logic in the template,
+                a(href="http://mustache.github.io", "mustache")
+                """ forbid you by design to embed any logic in the template,
                 because the template is not the place for it. emerald allows it
                 because it doesn't want to stand in your way, so it's up to you
                 to use its features with care."""
@@ -171,9 +171,9 @@ proc templ(numItems: int) {.html_templ.} =
             p:
                 """As any standalone call will create an HTML tag, emerald
                 provides a special syntax to actually call procs: Use the
-                familiar """; code("discard "); """command to call a proc
+                familiar """; code("discard"); """ command to call a proc
                 without using its return value, and the emerald-specific """
-                code("put "); "command to output the return value of a call."
+                code("put"); " command to output the return value of a call."
             p:
                 """If you have a snippet which you want to use multiple times,
                 or if you want to just separate a piece of your template from
@@ -212,7 +212,9 @@ myTempl.render(ss)
                 """While you write your template as proc, it isn't a proc
                 anymore after emerald has parsed it. Instead, it is an object
                 type. You can create a new instance with """;
-                code("new[Name]()"); """. This proc never takes parameters. The
+                code:
+                    "new"; em("Name"); "()"
+                """. This proc never takes parameters. The
                 parameters you declared for the template are settable as object
                 values. You can render the template by calling the object's """
                 code("render"); " proc. This proc takes a "; code("Stream")
@@ -221,5 +223,5 @@ myTempl.render(ss)
                 """, the template will be rendered into the given stream."""
             p:
                 """This concludes the tutorial. For a more detailed
-                documentation of emerald's features, refer to the documentation.
-                """
+                documentation of emerald's features, refer to the """
+                a(href="documentation.html", "documentation section"); "."
