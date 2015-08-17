@@ -1,0 +1,101 @@
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head><title>Tutorial</title><link rel="stylesheet" type="text/css" href="style.css"/><link rel="stylesheet" type="text/css" href="pygments.css"/></head><body><header><h1>emerald</h1><h2>a HTML templating engine for <a href="http://nim-lang.org/">Nim</a></h2></header><main><nav><ul><li class=""><a href="index.html">Home</a></li><li class="active"><a href="tutorial.html">Tutorial</a></li><li class=""><a href="documentation.html">Documentation</a></li></ul></nav><article><h1>Tutorial</h1><section><p>To be able to use emerald, you need to have it available on
+                your system. The easiest way to do that is to use the <a href="https://github.com/nim-lang/nimble">Nimble package manager</a>:</p><div class="highlight"><pre>$ nimble install emerald</pre></div><p>Now using emerald consists of three simple steps:</p><ol><li>Include <code>emerald</code> in your code.</li><li>Write templates</li><li>Call your templates</li></ol><p>Sounds easy enough, doesn't it? Let's look at the details.</p></section><section><figure><div class="highlight"><pre><span class="kn">include</span> <span class="n">emerald</span>
+</pre></div>
+<figcaption>include it.</figcaption></figure><h2>1. Include <code>emerald</code></h2><p>The <code>emerald</code> module contains imports, and only
+                imports, of everything you need to use emerald: The <code>streams</code> module from the standard library, and the
+                emerald modules <code>html</code> and <code>filters</code>. You could also import them directly, but as the list of
+                imports you need may change, including <code>emerald</code> is the safest way.</p></section><section><figure><div class="highlight"><pre><span class="k">proc </span><span class="nf">templ</span><span class="p">(</span><span class="n">pageTitle</span><span class="p">:</span> <span class="kt">string</span><span class="p">)</span> <span class="p">{.</span><span class="n">html_templ</span><span class="p">.}</span> <span class="o">=</span>
+    <span class="n">html</span><span class="p">(</span><span class="n">lang</span><span class="o">=</span><span class="s">&quot;en&quot;</span><span class="p">):</span>
+        <span class="n">head</span><span class="p">:</span>
+            <span class="n">title</span><span class="p">:</span> <span class="n">pageTitle</span>
+        <span class="n">body</span><span class="p">:</span>
+            <span class="n">p</span><span class="p">:</span> <span class="s">&quot;Content&quot;</span><span class="p">;</span> <span class="n">br</span><span class="p">();</span> <span class="s">&quot;More content&quot;</span>
+                
+</pre></div>
+<figcaption>write a template.</figcaption></figure><h2>2. Write templates</h2><p>You start writing a template with a proc header. The name
+                of the proc is the name of your template. The template may take
+                any number of parameters and may not have a return value. Then,
+                you apply the macro <code>html_templ</code> to it. This macro is provided by emerald and will parse
+                the body of the proc as html template.</p><p>In the body, every call that is a statement is interpreted as
+                HTML tag. A call is a statement if it is not part of an
+                expression, or put more simply: If it stands alone on its line.
+                Calls may take two forms: Either a simple call (e.g. <code>br()</code>) or a call with a child block (e.g. <code>head:</code>). The example shows you how this looks in
+                action.</p><figure><div class="highlight"><pre><span class="k">proc </span><span class="nf">templ</span><span class="p">(</span><span class="n">numItems</span><span class="p">:</span> <span class="kt">int</span><span class="p">)</span> <span class="p">{.</span><span class="n">html_templ</span><span class="p">.}</span> <span class="o">=</span>
+    <span class="n">html</span><span class="p">(</span><span class="n">lang</span><span class="o">=</span><span class="s">&quot;en&quot;</span><span class="p">):</span>
+        <span class="k">const</span> <span class="n">myTitle</span> <span class="o">=</span> <span class="s">&quot;Title&quot;</span>
+        <span class="n">head</span><span class="p">:</span>
+            <span class="n">title</span><span class="p">:</span> <span class="n">myTitle</span>
+        <span class="n">body</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">numItems</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">ul</span><span class="p">:</span>
+                    <span class="kd">var</span> <span class="n">content</span> <span class="o">=</span> <span class="s">&quot;x&quot;</span>
+                    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="mi">1</span> <span class="p">..</span> <span class="n">items</span><span class="p">:</span>
+                        <span class="n">li</span><span class="p">:</span> <span class="n">content</span>
+                        <span class="n">content</span> <span class="o">=</span> <span class="n">content</span> <span class="o">&amp;</span> <span class="s">&quot;x&quot;</span>
+</pre></div>
+<figcaption>use variables and control structures.</figcaption></figure><p>You can use <code>if</code>, <code>case</code> and <code>for</code> loops inside templates. You can also define and
+                use variables with <code>var</code>, <code>let</code> and <code>const</code>. Every expression that stands alone on a line
+                and is not a call will be transformed to a string and written to
+                the output HTML. By default, all string output will be filtered
+                to escape special HTML characters (<code>&amp;</code>, <code>&lt;</code>, <code>&gt;</code>).</p><p>                emerald checks your HTML structure when parsing your templates.
+                It may not be a fully replacement for the W3C HTML 5 validator,
+                but it throws errors when you try to use HTML tags at places
+                where they are forbidden, or if you forget to set required
+                attributes. By the way, attributes can be set as named
+                parameters, as you can see on the <code>html</code> element in the example. Instead of the string, you can
+                use any expression to define the attribute's value. Some HTML
+                attributes have names that are also keywords in Nim. When you
+                set them, you need to use backticks around the name (e.g. <code>`type`</code>).</p><figure><div class="highlight"><pre><span class="k">proc </span><span class="nf">templ</span><span class="p">(</span><span class="n">numItems</span><span class="p">:</span> <span class="kt">int</span><span class="p">)</span> <span class="p">{.</span><span class="n">html_templ</span><span class="p">.}</span> <span class="o">=</span>
+    <span class="n">html</span><span class="p">(</span><span class="n">lang</span><span class="o">=</span><span class="s">&quot;en&quot;</span><span class="p">):</span>
+        <span class="kd">var</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="n">ul</span><span class="p">:</span>
+            <span class="n">li</span><span class="p">:</span> <span class="n">i</span>
+            <span class="k">discard</span> <span class="n">inc</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+            <span class="n">li</span><span class="p">:</span> <span class="n">i</span>
+            <span class="n">li</span><span class="p">:</span>
+                <span class="n">put</span> <span class="n">substr</span><span class="p">(</span><span class="s">&quot;foobar&quot;</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
+</pre></div>
+<figcaption>use <code>put </code>and <code>discard </code> to call procs.</figcaption></figure><p>Be aware that while emerald allows you to embed quite much
+                business logic in your template, you shouldn't embed program
+                logic in the template unless it's absolutely necessary. Other
+                templating engines like e.g. <a href="http://mustache.github.io">mustache</a> forbid you by design to embed any logic in the template,
+                because the template is not the place for it. emerald allows it
+                because it doesn't want to stand in your way, so it's up to you
+                to use its features with care.</p><figure><div class="highlight"><pre><span class="k">proc </span><span class="nf">mySection</span><span class="p">(</span><span class="n">title</span><span class="p">:</span> <span class="kt">string</span><span class="p">)</span> <span class="p">{.</span><span class="n">html_mixin</span><span class="p">.}</span> <span class="o">=</span>
+    <span class="n">section</span><span class="p">:</span>
+        <span class="n">h1</span><span class="p">:</span> <span class="n">title</span>
+        <span class="n">put</span> <span class="n">mixin_content</span><span class="p">()</span>
+
+<span class="k">proc </span><span class="nf">templ</span><span class="p">(</span><span class="n">numItems</span><span class="p">:</span> <span class="kt">int</span><span class="p">)</span> <span class="p">{.</span><span class="n">html_templ</span><span class="p">.}</span> <span class="o">=</span>
+    <span class="n">html</span><span class="p">(</span><span class="n">lang</span><span class="o">=</span><span class="s">&quot;en&quot;</span><span class="p">):</span>
+        <span class="n">body</span><span class="p">:</span>
+            <span class="n">call_mixin</span> <span class="n">mySection</span><span class="p">(</span><span class="s">&quot;First section&quot;</span><span class="p">):</span>
+                <span class="n">p</span><span class="p">:</span> <span class="s">&quot;Content&quot;</span>
+            <span class="n">call_mixin</span> <span class="n">mySection</span><span class="p">(</span><span class="s">&quot;Second section&quot;</span><span class="p">):</span>
+                <span class="n">p</span><span class="p">:</span> <span class="s">&quot;More content&quot;</span>
+</pre></div>
+<figcaption>define and use mixins.</figcaption></figure><p>As any standalone call will create an HTML tag, emerald
+                provides a special syntax to actually call procs: Use the
+                familiar <code>discard</code> command to call a proc
+                without using its return value, and the emerald-specific <code>put</code> command to output the return value of a call.</p><p>If you have a snippet which you want to use multiple times,
+                or if you want to just separate a piece of your template from
+                the rest, you can use <em>mixins</em>. Mixins are snippets you can include multiple times in your
+                template. Like the template itself, mixins can take any number
+                of parameters. Mixins are even able to take block content as
+                input, which can be called from inside the mixin by using the
+                special call <code>mixin_content()</code>. In the template, you can call the mixin with the command <code>call_mixin</code>. Look at the example to see how this works.</p><p>There is no syntax to call another template from within a
+                template, because this is not considered a use-case that makes
+                sense. But you can call mixins from within mixins.</p></section><section><figure><div class="highlight"><pre><span class="kd">var</span>
+    <span class="n">ss</span> <span class="o">=</span> <span class="n">newStringStream</span><span class="p">()</span>
+    <span class="n">myTempl</span> <span class="o">=</span> <span class="n">newTempl</span><span class="p">()</span>
+<span class="n">myTempl</span><span class="p">.</span><span class="n">numItems</span> <span class="o">=</span> <span class="mi">3</span>
+<span class="n">myTempl</span><span class="p">.</span><span class="n">render</span><span class="p">(</span><span class="n">ss</span><span class="p">)</span>
+</pre></div>
+<figcaption>call your template.</figcaption></figure><h2>3. Call your templates</h2><p>While you write your template as proc, it isn't a proc
+                anymore after emerald has parsed it. Instead, it is an object
+                type. You can create a new instance with <code>new<em>Name</em>()</code>. This proc never takes parameters. The
+                parameters you declared for the template are settable as object
+                values. You can render the template by calling the object's <code>render</code> proc. This proc takes a <code>Stream</code>as second parameter after the template instance. When
+                calling <code>render</code>, the template will be rendered into the given stream.</p><p>This concludes the tutorial. For a more detailed
+                documentation of emerald's features, refer to the <a href="documentation.html">documentation section</a>.</p></section></article></main><footer><p>This documentation was generated with emerald.<br/>Its content is, like emerald itself, licensed under the
+                    <a href="http://www.wtfpl.net">WTFPL</a>.</p></footer><a href="https://github.com/flyx/emerald"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://camo.githubusercontent.com/652c5b9acfaddf3a9c326fa6bde407b87f7be0f4/68747470733a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f72696768745f6f72616e67655f6666373630302e706e67" alt="Fork me on GitHub" data-canonical-src="https://s3.amazonaws.com/github/ribbons/forkme_right_orange_ff7600.png"></a></body></html>

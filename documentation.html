@@ -1,0 +1,298 @@
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head><title>Documentation</title><link rel="stylesheet" type="text/css" href="style.css"/><link rel="stylesheet" type="text/css" href="pygments.css"/></head><body><header><h1>emerald</h1><h2>a HTML templating engine for <a href="http://nim-lang.org/">Nim</a></h2></header><main><nav><ul><li class=""><a href="index.html">Home</a></li><li class=""><a href="tutorial.html">Tutorial</a></li><li class="active"><a href="documentation.html">Documentation</a></li><li class="anchor"><a href="#interface">Interface</a></li><li class="anchor"><a href="#tags">Tags</a></li><li class="anchor"><a href="#attributes">Attributes</a></li><li class="anchor"><a href="#content">Text Content</a></li><li class="anchor"><a href="#control">Control Structures</a></li><li class="anchor"><a href="#pragmas">Pragmas</a></li><li class="anchor"><a href="#filters">Filters</a></li><li class="anchor"><a href="#inheritance">Template inheritance</a></li></ul></nav><article><h1>Documentation</h1><section><p>This is the complete documentation of emerald. It explains
+                all of emerald's features and also explains implementation
+                details, so it is also the developer documentation. The reader
+                is expected to be used to the Nim programming language and its
+                concepts.</p><p>emerald tries to omit HTML that is valid <a href="http://www.w3.org/TR/html-polyglot/">polyglot markup</a>, i.e. that is valid HTML 5 and also valid XHTML. This means
+                that emerald writes properly closed HTML tags in all cases, uses
+                quotes for attribute values, and writes a value for boolean
+                attributes where HTML permits the value to be omitted. The goal
+                is for emerald's output to be as robust as possible.</p></section><section><figure><div class="highlight"><pre><span class="k">proc </span><span class="nf">templ</span><span class="p">(</span><span class="n">param</span><span class="p">:</span> <span class="kt">string</span><span class="p">)</span> <span class="p">{.</span><span class="n">html_templ</span><span class="p">.}</span> <span class="o">=</span>
+    <span class="c">#...</span>
+</pre></div>
+<figcaption>input...</figcaption></figure><figure><div class="highlight"><pre><span class="k">type</span> <span class="n">templ</span> <span class="o">=</span> <span class="k">ref</span> <span class="k">object</span> <span class="k">of</span> <span class="n">RootObj</span>
+    <span class="n">param</span><span class="p">:</span> <span class="kt">string</span>
+
+<span class="k">proc </span><span class="nf">newTempl</span><span class="p">():</span> <span class="n">templ</span> <span class="o">=</span>
+    <span class="n">new</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+
+<span class="k">method</span> <span class="n">render</span><span class="p">(</span><span class="n">obj</span><span class="p">:</span> <span class="n">templ_class</span><span class="p">,</span> <span class="n">s</span><span class="p">:</span> <span class="n">Stream</span><span class="p">)</span> <span class="o">=</span>
+    <span class="c">#...</span>
+</pre></div>
+<figcaption>... the resulting AST, visualized as Nim code ...</figcaption></figure><figure><div class="highlight"><pre><span class="kd">var</span>
+    <span class="n">ss</span> <span class="o">=</span> <span class="n">newStringStream</span><span class="p">()</span>
+    <span class="n">myTempl</span> <span class="o">=</span> <span class="n">newTempl</span><span class="p">()</span>
+<span class="n">templ</span><span class="p">.</span><span class="n">param</span> <span class="o">=</span> <span class="s">&quot;foo&quot;</span>
+<span class="n">templ</span><span class="p">.</span><span class="n">render</span><span class="p">(</span><span class="n">ss</span><span class="p">)</span>
+</pre></div>
+<figcaption>... and how to use it in your code.</figcaption></figure><h2 id="interface">Interface</h2><p>The two macros <code>html_templ</code> and <code>html_mixin</code> are the main API of emerald. The only
+                other things that are publicly exposed are the filters that
+                come with emerald. These are explained in <a href="#filters">Filters</a>.</p><h3><code>html_templ</code></h3><p>This macro can only be applied to a proc. This proc may not
+                have a return type and may be publicly exposed (via <code>*</code>) or private. The whole content of the proc will
+                be parsed as HTML template. Parsing will convert the proc into
+                an object type with the same name, a constructor proc for this
+                type, and a method named <code>render()</code> that operates on this type. This is shown in the example code.</p><p>The <code>render</code> method takes an instance of the 
+                template object as first parameter and a <code>Stream</code> as second parameter. The object type, the constructor proc
+                and the render method will have the same visibility as the
+                original proc, so you can have private and public templates.</p><p>All parameters of the original proc will be transformed into
+                fields of the resulting object type. This enables you to re-use
+                an object instance multiple times without needing to specify all
+                parameters each time.</p><h3><code>html_mixin</code></h3><figure><div class="highlight"><pre><span class="k">proc </span><span class="nf">wrapWithSection</span><span class="p">(</span><span class="n">title</span><span class="p">:</span> <span class="kt">string</span><span class="p">)</span> <span class="p">{.</span><span class="n">html_mixin</span><span class="p">.}</span> <span class="o">=</span>
+    <span class="n">section</span><span class="p">:</span>
+        <span class="n">h1</span><span class="p">:</span> <span class="n">title</span>
+        <span class="n">put</span> <span class="n">mixin_content</span><span class="p">()</span>
+
+<span class="k">proc </span><span class="nf">templ</span><span class="p">()</span> <span class="p">{.</span><span class="n">html_templ</span><span class="p">.}</span> <span class="o">=</span>
+    <span class="n">body</span><span class="p">:</span>
+        <span class="n">call_mixin</span> <span class="n">wrapWithSection</span><span class="p">(</span><span class="s">&quot;Overview&quot;</span><span class="p">):</span>
+            <span class="n">p</span><span class="p">:</span> <span class="s">&quot;Foo&quot;</span>
+        <span class="n">call_mixin</span> <span class="n">wrapWithSection</span><span class="p">(</span><span class="s">&quot;Details&quot;</span><span class="p">):</span>
+            <span class="n">p</span><span class="p">:</span> <span class="s">&quot;Bar&quot;</span>
+</pre></div>
+<figcaption>define and use a mixin</figcaption></figure><p>This macro must also be applied to a proc that has no return
+                value. Parsing it will not produce any nodes in the resulting
+                AST; instead, it is parsed directly into the <code>render</code> proc at each place where it is called. There
+                are two reasons for doing that: Firstly, it enables emerald to
+                validate the HTML structure at each position where it is called.
+                Secondly, the resulting HTML is properly indented everywhere.</p><p>Mixins can be called with the <code>call_mixin</code> command. The command takes the call to the mixin as first
+                parameter; you have to give all parameters you defined for the
+                mixin there. You can also give a block as second parameter, in
+                which case this block can be called from within the mixin by
+                calling <code>mixin_content()</code>. If you call <code>mixin_content()</code> in the mixin code, but do not
+                supply a block as parameter in the template where you call the
+                mixin, emerald will exit with an error message.</p></section><section><figure><div class="highlight"><pre><span class="k">proc </span><span class="nf">templ</span><span class="p">()</span> <span class="p">{.</span><span class="n">html_templ</span><span class="p">.}</span> <span class="o">=</span>
+    <span class="c"># a tag with a child block</span>
+    <span class="n">body</span><span class="p">:</span>
+        <span class="c"># a tag without a child block</span>
+        <span class="n">img</span><span class="p">(</span><span class="n">src</span><span class="o">=</span><span class="s">&quot;foo.png&quot;</span><span class="p">)</span>
+        
+        <span class="c"># a tag which has its content defined as</span>
+        <span class="c"># direct content</span>
+        <span class="n">strong</span><span class="p">(</span><span class="s">&quot;Content&quot;</span><span class="p">)</span>
+        
+        <span class="c"># a tag condensed into one line along with</span>
+        <span class="c"># two string literals</span>
+        <span class="s">&quot;foo&quot;</span><span class="p">;</span> <span class="n">br</span><span class="p">();</span> <span class="s">&quot;bar&quot;</span>
+        
+        <span class="c"># a &lt;div&gt; can be written as &quot;d&quot;</span>
+        <span class="n">d</span><span class="p">:</span>
+            <span class="c"># a tag with a class</span>
+            <span class="n">p</span><span class="p">.</span><span class="n">someClass</span><span class="p">:</span> <span class="s">&quot;Bar&quot;</span>
+            
+            <span class="c"># a tag with two classes that needs</span>
+            <span class="c"># to be escaped</span>
+            <span class="p">`</span><span class="k">object</span><span class="p">`.</span><span class="n">foo</span><span class="p">.</span><span class="n">bar</span><span class="p">:</span> <span class="s">&quot;Foo&quot;</span>
+</pre></div>
+<figcaption>using the tag syntax</figcaption></figure><h2 id="tags">Tags</h2><p>In an HTML template, every standalone call is interpreted as
+                HTML tag. Standalone means that the call is not part of an
+                expression, or in simpler terms: The call is written on its own
+                line with nothing else there. You can of course condense 
+                multiple lines by using semicolons to make your code more
+                compact. Standalone calls may, but do not need to, have a child
+                block. The structure of the tags is validated according to the
+                HTML 5 specification. Infix expressions are not considered to
+                be calls; they will be parsed as text content generators (see
+                below).</p><p>The content of a tag may also be given as <em>direct content</em>, meaning that it is written as
+                parameter into the brackets of the tag, rather than into the
+                child block. This may be convenient for tags that usually occur
+                between character data, like e.g. <code>&lt;strong&gt;</code>.</p><p>If a tag name is also a keyword name in Nim, you have to put
+                the tag name between accents, like this: <code>`object`</code>. As a special feature, you can write <code>d</code> for <code>&lt;div&gt;</code> tags, because they are pretty common and <code>div</code> is a keyword in Nim.</p><p>You can give tags classes by using the dot notation, as
+                illustrated in the example. Tags can have any number of classes.
+                The dot notation is somewhat limited, because you cannot use
+                expressions for defining the class name, so you can also set the
+                attribute <code>class</code>. You can use both dot notation
+                and the <code>class</code> attribute on one tag.</p><p>The <code>html</code> tag is kind of a special feature. It
+                automatically emits the HTML 5 doctype, gets a proper XML
+                namespace definition, and its required attribute <code>lang</code> gets automatically copied into the attribute <code>xml:lang</code>, which is necessary for valid XHTML. That
+                does not mean that you must start every template with an <code>html</code> tag - it is perfectly fine to write templates
+                which only generate a part of an HTML DOM-tree. You would
+                use such templates e.g. for AJAX-based websites.</p></section><section><figure><div class="highlight"><pre><span class="k">proc </span><span class="nf">templ</span><span class="p">()</span> <span class="p">{.</span><span class="n">html_templ</span><span class="p">.}</span> <span class="o">=</span>
+    <span class="c"># required attribute; emerald will terminate</span>
+    <span class="c"># with an error if it&#39;s omitted</span>
+    <span class="n">html</span><span class="p">(</span><span class="n">lang</span><span class="o">=</span><span class="s">&quot;en&quot;</span><span class="p">):</span>
+        <span class="k">let</span> <span class="n">large</span> <span class="o">=</span> <span class="kp">false</span>
+        
+        <span class="c"># complex expression as value </span>
+        <span class="n">img</span><span class="p">(</span><span class="n">src</span><span class="o">=</span><span class="k">if</span> <span class="n">large</span><span class="p">:</span> <span class="s">&quot;foo-large.png&quot;</span>
+            <span class="k">else</span><span class="p">:</span> <span class="s">&quot;foo.png&quot;</span><span class="p">)</span>
+
+        <span class="c"># attribute name that must be escaped</span>
+        <span class="n">script</span><span class="p">(`</span><span class="k">type</span><span class="p">`</span><span class="o">=</span><span class="s">&quot;text/javascript&quot;</span><span class="p">,</span>
+               <span class="n">src</span><span class="o">=</span><span class="s">&quot;foo.js&quot;</span><span class="p">)</span>
+        
+        <span class="kd">var</span> <span class="n">myClass</span><span class="o">=</span><span class="s">&quot;active&quot;</span>
+        <span class="c"># defining classes with dot notation</span>
+        <span class="c"># and attribute</span>
+        <span class="n">d</span><span class="p">.</span><span class="n">main</span><span class="p">(</span><span class="n">class</span><span class="o">=</span><span class="n">myClass</span><span class="p">)</span>
+</pre></div>
+<figcaption>set attribute values</figcaption></figure><h2 id="attributes">Attributes</h2><p>For each tag, attributes can be specified in the brackets of
+                the tag call. The name of the attribute comes first, followed by
+                an equals sign and the value of the attribute. The value may be
+                any Nim expression. Attributes which are specified to be
+                boolean, such as <code>checked</code> or <code>readonly</code>, must have an expression of Nim type <code>bool</code> as value. All other attribute values will be converted into
+                strings.</p><p>Like tags, attributes are validated by emerald. A missing
+                required attribute and an attribute that is not allowed for the
+                tag that contains it both lead to an error message.</p><p>Attribute values are automatically filtered. Unlike the
+                filtering of normal text, the filtering of attribute values
+                cannot be customized, because there is no use-case for that
+                (please file an issue if you can think of one). Filtering will
+                convert the characters <code>&lt;</code>, <code>&gt;</code>, <code>&amp;</code>, <code>"</code> and <code>'</code> to their corresponding HTML entities.</p></section><section><figure><div class="highlight"><pre><span class="k">proc </span><span class="nf">templ</span><span class="p">()</span> <span class="p">{.</span><span class="n">html_templ</span><span class="p">.}</span> <span class="o">=</span>
+    <span class="c"># simple string literal</span>
+    <span class="s">&quot;Foobar&quot;</span>
+    
+    <span class="c"># triple quoted string literal</span>
+    <span class="s">&quot;&quot;&quot;Lorem ipsum dolor sit amet,</span>
+<span class="s">    consectetur adipiscing elit. Quisque</span>
+<span class="s">    nibh leo, tincidunt in feugiat ac,</span>
+<span class="s">    egestas ac libero.&quot;&quot;&quot;</span>    
+    
+    <span class="c"># result of an infix call</span>
+    <span class="mi">2</span> <span class="o">+</span> <span class="mi">2</span>
+    
+    <span class="kd">var</span> <span class="n">a</span> <span class="o">=</span> <span class="s">&quot;foo&quot;</span>
+    <span class="c"># the value of a variable</span>
+    <span class="n">a</span>
+    
+    <span class="c"># the value of a proc call</span>
+    <span class="n">put</span> <span class="n">getDateStr</span><span class="p">()</span>
+    
+    <span class="kd">var</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="c"># call a proc without a return value</span>
+    <span class="k">discard</span> <span class="n">inc</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+</pre></div>
+<figcaption>creating text content</figcaption></figure><h2 id="content">Text Content</h2><p>Text content is generated by every expression that is used as
+                a statement, excluding calls (which are used for creating HTML
+                tags). The simplest way to generate text content is to use
+                string literals. Infix expressions also generate text content,
+                although they are technically calls. The operator <code>$</code> is used to transform any value into a string for outputting
+                it.</p><p>If you want to call a proc and output the result as text
+                content, you have to use the command <code>put</code>,
+                because normal calls are interpreted as HTML tags. If you just
+                want to call a proc without using its return value - or a proc
+                which does not have a return value at all - use <code>discard</code>.</p><p>All text content is processed by the current filter chain
+                before being written to the output. By default, this converts
+                the HTML characters <code>&lt;</code>, <code>&gt;</code> and <code>&amp;</code> to their corresponding HTML entities. The filter
+                chain can be customized to your needs, see the next section.</p></section><section><figure><div class="highlight"><pre><span class="k">proc </span><span class="nf">templ</span><span class="p">()</span> <span class="p">{.</span><span class="n">html_templ</span><span class="p">.}</span> <span class="o">=</span>
+    <span class="c"># define variables</span>
+    <span class="k">const</span> <span class="n">max</span> <span class="o">=</span> <span class="mi">5</span>
+    <span class="kd">var</span> <span class="n">current</span> <span class="o">=</span> <span class="mi">2</span>
+    
+    <span class="n">ul</span><span class="p">:</span>
+        <span class="c"># use a for loop</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="mi">0</span> <span class="p">..</span> <span class="n">val</span><span class="p">:</span>
+            <span class="n">li</span><span class="p">:</span>
+                <span class="c"># use if</span>
+                <span class="k">if</span> <span class="n">i</span> <span class="o">==</span> <span class="n">current</span><span class="p">:</span>
+                    <span class="n">i</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">a</span><span class="p">(</span><span class="n">href</span><span class="o">=$</span><span class="n">i</span> <span class="o">&amp;</span> <span class="s">&quot;.html&quot;</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
+</pre></div>
+</figure><h2 id="control">Control structures</h2><p>Most of Nim's control structures are directly usable in
+                emerald: You can use <code>if</code>, <code>case</code> and <code>while</code> just like you would in Nim code.
+                You can also declare and assign variables in your template.
+                However, you cannot do everything in emerald you could do in
+                Nim, and if you need to write logic that spans more than a few
+                lines, it is probably a good idea to write it in a proper Nim
+                proc and call that from within your template.</p></section><section><h2 id="pragmas">Pragmas</h2><p>You can modify the way emerald compiles your template by
+                using pragmas. Pragmas use the usual Nim syntax <code>{. <em>pragma here</em> .}</code>. emerald supports the following pragmas:</p><dl><dt><code>{. compact_mode = <em>val</em> .}</code></dt><dd>Toggles whether the generated HTML should be written
+                    in human-readable form with newlines and indentation, or as
+                    compact as possible without any unnecessary whitespace. <em>val</em> may be either <code>true</code> or <code>false</code>, default value is <code>false</code>.</dd><dt><code>{. indent_step = <em>val</em> .}</code></dt><dd>Sets the amount of spaces added to every new level of
+                    indentation. <em>val</em> may be any non-negative
+                    integer value. default is <code>4</code>.</dd><dt><code>{. preserve_whitespace = <em>val</em> .}</code></dt><dd>Defines whether the lines of generated text content will
+                    be indented to the current output indentation, removing any
+                    existing indentation. <em>val</em> may be <code>true</code> or <code>false</code>, default is <code>false</code>.If <code>true</code>, the existing
+                    whitespace at the beginning of each line for text output
+                    will be preserved and no indentation will be applied (
+                    regardless of the value of <code>compact_mode</code>. This is useful when inserting source code or anything
+                    similar in your HTML page.</dd><dt><code>{. debug = <em>val</em> .}</code></dt><dd>Enables or disables debugging output. If enabled,
+                    emerald will output the generated AST as Nim code to
+                    stdout. <em>val</em> may be <code>true</code> or <code>false</code>, default is <code>false</code>.</dd><dt><code>{. filters = <em>filter_chain</em> .}</code></dt><dd>This pragma manipulates the filter chain and is 
+                    described in detail in the next section.</dd></dl><p>Apart from <code>debug</code>, all pragmas are applied to
+                the current level of your template code, not globally. That
+                means that the new pragma value you have set only affects the
+                content of the current HTML tag and all tags within, but not
+                the part of the template outside the current HTML tag.</p></section><section><figure><div class="highlight"><pre><span class="k">proc </span><span class="nf">templ</span><span class="p">()</span> <span class="p">{.</span><span class="n">html_templ</span><span class="p">.}</span> <span class="o">=</span>
+    <span class="n">html</span><span class="p">(</span><span class="n">lang</span><span class="o">=</span><span class="s">&quot;en&quot;</span><span class="p">):</span>
+        <span class="n">head</span><span class="p">:</span>
+            <span class="c"># disable all filters</span>
+            <span class="p">{.</span> <span class="n">filters</span> <span class="o">=</span> <span class="kp">nil</span> <span class="p">.}</span>
+            <span class="s">&quot;&lt;title&gt;Title&lt;/title&gt;&quot;</span>
+        <span class="n">body</span><span class="p">:</span>
+            <span class="c"># escape_html is active here, because</span>
+            <span class="c"># we left the tag &quot;head&quot;</span>
+            
+            <span class="n">d</span><span class="p">:</span>
+                <span class="c"># parse the following content with</span>
+                <span class="c"># pygments.</span>
+                <span class="p">{.</span> <span class="n">filters</span> <span class="o">=</span> <span class="n">pygmentize</span><span class="p">(</span><span class="s">&quot;nim&quot;</span><span class="p">)</span> <span class="p">.}</span>
+                <span class="s">&quot;&quot;&quot;</span>
+<span class="s">proc foo() =</span>
+<span class="s">    bar()</span>
+<span class="s">                &quot;&quot;&quot;</span>
+                <span class="c"># still use pygmentize, but escape</span>
+                <span class="c"># the HTML characters coming from it</span>
+                <span class="p">{.</span> <span class="n">filters</span> <span class="o">=</span> <span class="n">filters</span> <span class="o">&amp;</span> <span class="n">escape_html</span><span class="p">()</span> <span class="p">.}</span>
+
+                <span class="c"># ...</span>
+</pre></div>
+<figcaption>modifying the filter chain</figcaption></figure><h2 id="filters">Filters</h2><p>emerald maintains a filter chain while compiling your
+                template. All text content is processed by the current filter
+                chain. The filter chain may contain zero or more filters. A
+                filter is a proc that takes a string as input and writes data
+                to an output stream. By default, the filter chain contains one
+                filter, <code>escape_html</code>, which converts HTML
+                special characters to their corresponding entities.</p><p>You can modify the filter chain by using the pragma <code>filters</code>, which allows you to specify the filter
+                chain as a list of filters separated by <code>&amp;</code> operators. You may use the identifier <code>filters</code>when setting this chain to insert the previously active
+                filters. You may use <code>nil</code> to specify that no
+                filter at all should be used. The code example shows how to use
+                the pragma.</p><p>Filters may take additional parameters. You can set them in
+                brackets as seen in the example.</p><h3>Builtin Filters</h3><dl><dt><code>escape_html(escapeQuotes: bool = false)</code></dt><dd>Convert HTML special chars to their corresponding
+                    entities. if <code>escapeQuotes</code> is <code>true</code>, <code>"</code> and <code>'</code> are escaped as well.</dd><dt><code>rst(options: TRstParseOptions = {},
+                         config: StringTableRef = newStringTable())</code></dt><dd>Parses the input as RST, using Nim's internal RST
+                    implementation. Be aware that the resulting HTML is not
+                    validated by emerald.</dd><dt><code>pygmentize(language: string)</code></dt><dd>Uses <a href="http://pygments.org">pygments</a> to add syntax highlighting to text output. Pygments must
+                    be available on your system in order to use this filter.
+                    You have to include a pygments css theme in order to
+                    actually see the syntax highlighting in the rendered output.
+                    </dd></dl><figure><div class="highlight"><pre><span class="k">proc </span><span class="nf">remove_vowels</span><span class="p">(</span><span class="n">target</span><span class="p">:</span> <span class="n">Stream</span><span class="p">,</span> <span class="n">value</span> <span class="p">:</span> <span class="kt">string</span><span class="p">)</span> <span class="o">=</span>
+    <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">value</span><span class="p">:</span>
+        <span class="k">case</span> <span class="n">c</span>
+        <span class="k">of</span> <span class="sc">&#39;a&#39;</span><span class="p">,</span> <span class="sc">&#39;e&#39;</span><span class="p">,</span> <span class="sc">&#39;i&#39;</span><span class="p">,</span> <span class="sc">&#39;o&#39;</span><span class="p">,</span> <span class="sc">&#39;u&#39;</span><span class="p">:</span> <span class="k">discard</span>
+        <span class="k">else</span><span class="p">:</span> <span class="n">target</span><span class="p">.</span><span class="n">write</span><span class="p">(</span><span class="n">c</span><span class="p">)</span>
+</pre></div>
+<figcaption>a simple filter</figcaption></figure><h3>Writing Your Own Filters</h3><p>Filters are simple procs. If you want to write your own
+                filter, you just implement it as proc. It should look like 
+                this:</p><p><code>proc myFilter(target: Stream, value: string, ...)</code></p><p>At <code>...</code>, you can add your own parameters. You
+                need to give values for any non-optional parameters you add here
+                when using the filter. The first two parameters are added by
+                emerald when you use the filter in the filter chain.</p><p>When the filter gets called, you should process <code>value</code> and write the result to <code>target</code>. That's all.</p></section><section><figure><div class="highlight"><pre><span class="k">proc </span><span class="nf">parent</span><span class="p">(</span><span class="n">title</span><span class="p">:</span> <span class="kt">string</span><span class="p">,</span>
+            <span class="n">homeUrl</span><span class="p">:</span> <span class="kt">string</span><span class="p">)</span> <span class="p">{.</span> <span class="n">html_templ</span> <span class="p">.}</span> <span class="o">=</span>
+    <span class="n">html</span><span class="p">(</span><span class="n">lang</span><span class="o">=</span><span class="s">&quot;en&quot;</span><span class="p">):</span>
+        <span class="n">head</span><span class="p">:</span>
+            <span class="n">title</span><span class="p">:</span> <span class="n">title</span>
+        <span class="n">body</span><span class="p">:</span>
+            <span class="n">h1</span><span class="p">:</span>
+                <span class="n">a</span><span class="p">(</span><span class="n">href</span><span class="o">=</span><span class="n">homeUrl</span><span class="p">):</span> <span class="n">title</span>
+            <span class="k">block</span> <span class="n">content</span><span class="p">:</span> <span class="k">discard</span>
+
+<span class="k">proc </span><span class="nf">home</span><span class="p">()</span> <span class="p">{.</span> <span class="n">html_templ</span><span class="p">:</span> <span class="n">parent</span> <span class="p">.}</span> <span class="o">=</span>
+    <span class="n">title</span> <span class="o">=</span> <span class="s">&quot;Home&quot;</span>
+    <span class="n">replace</span> <span class="n">content</span><span class="p">:</span>
+        <span class="n">p</span><span class="p">:</span> <span class="s">&quot;Content&quot;</span>
+</pre></div>
+<figcaption>inheriting from a template</figcaption></figure><h2 id="inheritance">Template Inheritance</h2><p>You can inherit from templates by specifying the parent
+                template when declaring the child template. This will make the
+                generated object type of the child template inherit from the
+                object type of the parent template.</p><p>In any template that inherits from another template, you
+                cannot have HTML tags or text content nodes on the root level.
+                However, you can assign values to the parent template's
+                parameters. For adding content, you use the following commands:
+                <code>prepend</code>, <code>replace</code> and <code>append</code>. Each of these takes one argument and must
+                have a child block. The argument must be the name of a block in
+                any parent template (does not need to be the immediate parent).
+                <code> prepend</code> will add its content before the
+                content of the block in the parent template, <code>replace</code> will completely replace the content of the
+                block, and <code>append</code> will append its content to
+                the block in the parent template.</p><p>Blocks must always have names in templates. You may still use
+                them for scoping variables as you can do it in Nim, but be aware
+                that each block will be compiled into a multimethod.</p></section></article></main><footer><p>This documentation was generated with emerald.<br/>Its content is, like emerald itself, licensed under the
+                    <a href="http://www.wtfpl.net">WTFPL</a>.</p></footer><a href="https://github.com/flyx/emerald"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://camo.githubusercontent.com/652c5b9acfaddf3a9c326fa6bde407b87f7be0f4/68747470733a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f72696768745f6f72616e67655f6666373630302e706e67" alt="Fork me on GitHub" data-canonical-src="https://s3.amazonaws.com/github/ribbons/forkme_right_orange_ff7600.png"></a></body></html>
