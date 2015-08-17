@@ -11,7 +11,9 @@ proc layout*(title: string,
     {. compact_mode = true .}
     html(lang="en"):
         head:
-            title: title
+            title:
+                "emerald, a Nim HTML templating engine - "
+                title    
             link(rel="stylesheet", `type`="text/css", href="style.css")
             link(rel="stylesheet", `type`="text/css", href="pygments.css")
         body:
