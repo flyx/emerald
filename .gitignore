@@ -2,3 +2,4 @@ nimcache
 nakefile
 doc/generate
 doc/site
+compile_*.sh
