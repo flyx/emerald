@@ -162,6 +162,10 @@ proc process_pragma(writer: OptionalStmtListWriter, node: NimNode,
 proc copy_tree_replace_params(context: ParseContext, node: NimNode,
             keepThisIdent: bool = false): NimNode
         {.compileTime.} =
+    ## copies a NimNode tree and replaces all parameters that are template
+    ## parameters by dot expressions to the corresponding field of the template
+    ## class. keepThisIdent is used to prevent idents in dot expressions from
+    ## being replaced.
     if node.kind == nnkIdent and not keepThisIdent:
         var isTemplParam = false
         block searchForParam:
@@ -589,7 +593,7 @@ proc parse_children(writer: StmtListWriter, context: ParseContext,
         of nnkInfix, nnkDotExpr:
             if context.mode == unknown:
                 context.mode = flowmode
-            writer.add_filtered(node)
+            writer.add_filtered(copy_tree_replace_params(context, node))
         of nnkIdent:
             if context.mode == unknown:
                 context.mode = flowmode
