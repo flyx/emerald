@@ -49,7 +49,7 @@ proc templ(youAreUsingEmerald: bool) {.html_templ.} =
         """""" & """
 
     body:
-      h1: "Emerald - Nimrod HTML5 templating engine"
+      h1: "Emerald - Nim HTML5 templating engine"
       d.content:
         if youAreUsingEmerald:
           p: "You are amazing"; br(); "Continue."
@@ -74,7 +74,7 @@ proc templ(youAreUsingEmerald: bool) {.html_templ.} =
             }</script>
     </head>
     <body>
-        <h1>Emerald - Nimrod HTML5 templating engine</h1>
+        <h1>Emerald - Nim HTML5 templating engine</h1>
         <div class="content">
             <p>You are amazing<br/>Continue.</p>
             <p>Emerald is a macro-based type-safe
