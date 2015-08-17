@@ -133,9 +133,9 @@ proc templ(numItems: int) {.html_templ.} =
                 {. preserve_whitespace = false .}
                 figcaption:
                     "use "
-                    code: "put "
-                    "and "
-                    code: "discard "
+                    code: "put"
+                    " and "
+                    code: "discard"
                     " to call procs."
             p:
                 """Be aware that while emerald allows you to embed quite much
@@ -218,7 +218,7 @@ myTempl.render(ss)
                 parameters you declared for the template are settable as object
                 values. You can render the template by calling the object's """
                 code("render"); " proc. This proc takes a "; code("Stream")
-                """as second parameter after the template instance. When
+                """ as second parameter after the template instance. When
                 calling """; code("render")
                 """, the template will be rendered into the given stream."""
             p:

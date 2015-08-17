@@ -335,6 +335,7 @@ proc templ() {.html_templ.} =
 """
                 {. filters = escape_html() .}
                 {. preserve_whitespace = false .}
+                figcaption: "using control structures"
             h2(id="control"): "Control structures"
             p:
                 """Most of Nim's control structures are directly usable in
@@ -376,7 +377,7 @@ proc templ() {.html_templ.} =
                     be indented to the current output indentation, removing any
                     existing indentation. """; em("val"); " may be "
                     code("true"); " or "; code("false"); ", default is "
-                    code("false"); "."; "If "; code("true"); """, the existing
+                    code("false"); ". If "; code("true"); """, the existing
                     whitespace at the beginning of each line for text output
                     will be preserved and no indentation will be applied (
                     regardless of the value of """; code("compact_mode")
