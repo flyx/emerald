@@ -7,7 +7,7 @@ copyFile("style.css", "site/style.css")
 copyFile("pygments.css", "site/pygments.css")
 
 var
-    fs = newFileStream("site/home.html", fmWrite)
+    fs = newFileStream("site/index.html", fmWrite)
     mainPageTempl = newHome()
     tutorialTempl = newTut()
     documentationTempl = newDoc()

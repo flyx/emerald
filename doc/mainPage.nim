@@ -2,7 +2,7 @@ include ../src/emerald
 
 import layout
 
-layout.sites.add((title: "Home", url: "home.html", anchors: @[]))
+layout.sites.add((title: "Home", url: "index.html", anchors: @[]))
 
 proc home*() {. html_templ: layout .} =
     title = "Home"
@@ -61,7 +61,7 @@ proc templ(youAreUsingEmerald: bool) {.html_templ.} =
           templating engine which validates your
           HTML structure and relieves you from
           the ugly mess that HTML code is.
-              """"""
+          """"""
         
                 {. filters = pygmentize("html") .}
                 """
