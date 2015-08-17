@@ -82,7 +82,8 @@ proc templ(youAreUsingEmerald: bool) {.html_templ.} =
                 the ugly mess that HTML code is.</p>
         </div>
     </body>
-</html>"""
+</html>
+                """
 
             p:
                 """To get started with emerald, have a look at the """

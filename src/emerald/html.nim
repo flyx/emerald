@@ -534,6 +534,7 @@ proc parse_tag(writer: StmtListWriter, context: ParseContext,
         if finishInBlockMode:
             writer.add_literal(context.indentation)
         writer.add_literal("</" & name & ">")
+        writer.filters = context.filters
     elif directContent != nil:
         writer.add_literal(">")
         writer.add_filtered(directContent)
