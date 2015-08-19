@@ -8,6 +8,11 @@ proc simple_templ() {. html_templ .} =
     body:
         call_mixin simple_mixin()
 
+proc different_style_call() {. html_templ .} =
+    {. compact_mode = true .}
+    body:
+        callMixin simple_mixin()
+
 proc mixin_with_params(content: string) {. html_mixin .} =
     p: content
 
@@ -39,7 +44,7 @@ proc templ_for_mixin_with_params_and_content() {. html_templ .} =
 
 proc inner_mixin() {. html_mixin .} =
     footer:
-        put mixin_content()
+        put mixinContent()
 
 proc outer_mixin() {. html_mixin .} =
     d:
@@ -58,6 +63,14 @@ suite "mixins":
         var
             ss = newStringStream()
             templ = newSimpleTempl()
+        templ.render(ss)
+        ss.flush()
+        check diff(ss.data, """<body><p>Simple mixin</p></body>""")
+    
+    test "call mixin with different style":
+        var
+            ss = newStringStream()
+            templ = newDifferentStyleCall()
         templ.render(ss)
         ss.flush()
         check diff(ss.data, """<body><p>Simple mixin</p></body>""")

@@ -29,6 +29,14 @@ proc doc*() {. html_templ: layout .} =
                 quotes for attribute values, and writes a value for boolean
                 attributes where HTML permits the value to be omitted. The goal
                 is for emerald's output to be as robust as possible."""
+            p:
+                """Like Nim itself, emerald treats all keywords, commands and
+                procs it declares independently of style and casing, so you can
+                use both """; code("mixin_content"); " and "
+                code("mixinContent"); """ as you please. HTML tag and
+                attribute names are also parsed case-independently; however,
+                the styling matters here: """; code("http_equiv")
+                " is not the same as "; code("httpEquiv"); "."
         section:
             figure:
                 {. filters = pygmentize("nim") .}
@@ -262,6 +270,13 @@ proc templ() {.html_templ.} =
                 convert the characters """; code("<"); ", "; code(">"); ", "
                 code("&"); ", "; code("\""); " and "; code("'")
                 " to their corresponding HTML entities."
+            p:
+                "Some HTML attributes contain a "; code("-"); """ in their name.
+                This cannot be a part of a Nim identifier. Therefore, you must
+                use a """; code("_"); """ instead. So, for example, you have to
+                write """; code("http_equiv"); " instead of "
+                code("http-equiv"); ". Also be aware that attribute names are
+                case and style sensitive."
             h3(id="data-attributes"): "Data Attributes"
             p:
                 """HTML 5 allows any HTML tag to have an arbitrary number of """

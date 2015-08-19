@@ -1,10 +1,20 @@
-import macros, sets, streams, tables, strutils
+import macros, sets, streams, tables, strutils, hashes
 
 import private/writer
 import private/context
 import private/html5
 import private/tagdef
 import filters
+
+# commands / magic idents used by emerald.
+let
+    hPrepend      {.compileTime.} = hashIgnoreStyle("prepend")
+    hReplace      {.compileTime.} = hashIgnoreStyle("replace")
+    hAppend       {.compileTime.} = hashIgnoreStyle("append")
+    hCall         {.compileTime.} = hashIgnoreStyle("call")
+    hPut          {.compileTime.} = hashIgnoreStyle("put")
+    hCallMixin    {.compileTime.} = hashIgnoreStyle("call_mixin")
+    hMixinContent {.compileTime.} = hashIgnoreStyle("mixin_content")
 
 template quit_unknown[T](node: NimNode, what: string, val: T) =
     quit "[emerald] " & node.lineInfo & ": Unknown " & what & ": \"" & $val & "\""
@@ -211,8 +221,9 @@ proc process_block_replacements(content: NimNode,
         of nnkPragma:
             process_pragma(nil, node[0], context)
         of nnkCommand:
-            case node[0].ident_name
-            of "replace", "append", "prepend":
+            let commandHash = hashIgnoreStyle(node[0].ident_name)
+            case commandHash
+            of hReplace, hAppend, hPrepend:
                 if node[1].kind != nnkIdent:
                     quit_unexpected(node[1], "token (expected ident)",
                             node[1].kind)
@@ -266,11 +277,11 @@ proc process_block_replacements(content: NimNode,
                     let streamName = genSym(nskParam, ":stream")
                     var procContent = write_proc_content(streamName, node[2],
                                                          childMethodContext)
-                    if node[0].ident_name == "append":
+                    if commandHash == hAppend:
                         procContent.insert(0, newNimNode(nnkCommand).add(
                                 ident("procCall"), newCall(baseMethodName,
                                 newCall(curClass.symbol, objName), streamName)))
-                    elif node[0].ident_name == "prepend":
+                    elif commandHash == hPrepend:
                         procContent.add(newNimNode(nnkCommand).add(
                                 ident("procCall"), newCall(baseMethodName,
                                 newCall(curClass.symbol, objName), streamName)))
@@ -479,7 +490,7 @@ proc parse_tag(writer: StmtListWriter, context: ParseContext,
             if not (node[i][0].kind in [nnkIdent, nnkAccQuoted]):
                 quit_unexpected(node[i][0], "token", node[i][0].kind)
             
-            let attrName = node[i][0].ident_name
+            let attrName = toLower(node[i][0].ident_name)
             var added = false
             if attrName == "class":
                 if classes.len > 0:
@@ -592,7 +603,7 @@ proc parse_children(writer: StmtListWriter, context: ParseContext,
                 if context.depth != -1:
                     writer.add_literal("\n")
             let
-                childName = node[0].first_ident
+                childName = toLower(node[0].first_ident)
                 childTag  = tagIdFor(childName)
             if childTag == unknownTag:
                 quit_unknown(node[0], "tag", childName)
@@ -666,14 +677,15 @@ proc parse_children(writer: StmtListWriter, context: ParseContext,
             writer.add_node(newCall(methodName, objName, writer.target_stream))
             
         of nnkCommand:
-            case node[0].ident_name
-            of "call":
+            let commandHash = hashIgnoreStyle(node[0].ident_name)
+            case commandHash
+            of hCall:
                 for i in 1..(node.len - 1):
                     writer.add_node(copy_tree_replace_params(context, node[i]))
-            of "put":
+            of hPut:
                 for i in 1..(node.len - 1):
                     if node[i].kind == nnkCall and
-                            $node[i][0] == "mixin_content" and
+                            hashIgnoreStyle($node[i][0]) == hMixinContent and
                             node[i].len == 1:
                         let mixinLevel = context.pop_mixin_level()
                         if not mixinLevel.callable:
@@ -702,7 +714,7 @@ proc parse_children(writer: StmtListWriter, context: ParseContext,
                     else:
                         writer.add_filtered(copy_tree_replace_params(context,
                                 node[i]))
-            of "call_mixin":
+            of hCallMixin:
                 # if we just directly paste the parsed mixin code here, all
                 # symbols that are visible here are visible in the mixin. we
                 # don't want to have that. therefore, we instanciate a new proc

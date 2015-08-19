@@ -106,7 +106,7 @@ macro tag_list*(content: stmt): stmt {.immediate.} =
     var
         tagIdForCase = newNimNode(nnkCaseStmt).add(
                 newNimNode(nnkInfix).add(ident("and"),
-                newCall("hash", ident("name")), newCall("high",
+                newCall("hashIgnoreCase", ident("name")), newCall("high",
                 ident("int32"))))
         tagDefForCase = newNimNode(nnkCaseStmt).add(ident("id"))
         isGlobalAttrCase = newNimNode(nnkCaseStmt).add(ident("name"))
@@ -183,7 +183,7 @@ macro tag_list*(content: stmt): stmt {.immediate.} =
         for definedTag in childrenList.children:
             let
                 childName = ident_name(definedTag)
-                childHash = hash(childName) and high(int32)
+                childHash = hashIgnoreCase(childName) and high(int32)
                 tagId = tags.id(childName, true)
         
             block tagIdForProcessing:
