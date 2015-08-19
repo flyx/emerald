@@ -33,7 +33,7 @@ proc home*() {. html_templ: layout .} =
                     templates. You can define your base structure in a master
                     template, and add content with child templates. emerald is
                     still able to check the whole resulting HTML structure."""
-            d:
+            d(id="main-example"):
                 {. filters = pygmentize("nim") .}
                 {. preserve_whitespace = true .}
                 """
