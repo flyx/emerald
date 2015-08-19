@@ -489,6 +489,23 @@ proc parse_tag(writer: StmtListWriter, context: ParseContext,
                             copy_tree_replace_params(context, node[i][1])))
                     added = true
                     classes = ""
+            if attrName == "data":
+                if node[i][1].kind != nnkTableConstr:
+                    quit_invalid(node[i][1],
+                            "value kind for data (expected table constructor)",
+                            node[i][1].kind)
+                for dataPair in node[i][1].children:
+                    # this couldn't be a table constructor if this assertion
+                    # fails
+                    assert dataPair.kind == nnkExprColonExpr
+                    if dataPair[0].kind != nnkStrLit:
+                        quit_invalid(dataPair[0],
+                                "key token (expected string literal)",
+                                dataPair[0].kind)
+                    writer.add_attr_val("data-" & dataPair[0].strVal,
+                            newCall(ident("$"),
+                            copy_tree_replace_params(context, dataPair[1])))
+                added = true
             if not added:
                 if is_bool_attr(attrName):
                     writer.add_bool_attr(attrName, node[i][1])

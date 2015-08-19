@@ -231,6 +231,10 @@ proc templ() {.html_templ.} =
         # defining classes with dot notation
         # and attribute
         d.main(class=myClass)
+        
+        # defining data attributes
+        const varValue = "value2"
+        d(data={"key1": "value1", "key2": varValue})
 """
 
                 {. filters = escape_html() .}
@@ -258,6 +262,19 @@ proc templ() {.html_templ.} =
                 convert the characters """; code("<"); ", "; code(">"); ", "
                 code("&"); ", "; code("\""); " and "; code("'")
                 " to their corresponding HTML entities."
+            h3(id="data-attributes"): "Data Attributes"
+            p:
+                """HTML 5 allows any HTML tag to have an arbitrary number of """
+                em("data"); " attributes, named like this: "; code("data-*")
+                """emerald treats these values as a table, meaning that you can
+                assign the """; code("data"); " attribute a "
+                a(href="http://nim-lang.org/docs/manual.html#statements-and-expressions-table-constructor",
+                        "table constructor");
+                """. This constructor must have string literals as keys, so that
+                emerald can check the validity of the names at compile time - it
+                doesn't make much sense to define the data attribute names with
+                variables anyway. The value of each data attribute may be any
+                expression. The example shows how to set data attributes."""
         section:
             figure:
                 {. filters = pygmentize("nim") .}
