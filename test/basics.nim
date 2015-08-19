@@ -1,17 +1,9 @@
-import unittest, strutils
+import testbase
 
 include ../src/emerald
 
 import basics_publicTemplate
 
-proc diff(actual, expected: string): bool =
-    result = actual.len == expected.len
-    for i in 0 .. min(actual.len, expected.len) - 1:
-        if actual[i] != expected[i]:
-            echo "difference at $1: $2 != $3" % [$i, $actual[i], $expected[i]]
-            result = false
-    if not result:
-        echo "expected:\n$1\n\nactual:\n$2" % [expected, actual]
 
 proc base() {.html_templ.} =
     html(lang="en"):

@@ -1,4 +1,4 @@
-import unittest
+import testbase
 
 include ../src/emerald
 
@@ -62,7 +62,7 @@ suite "mixins":
             templ = newSimpleTempl()
         templ.render(ss)
         ss.flush()
-        check ss.data == """<body><p>Simple mixin</p></body>"""
+        check diff(ss.data, """<body><p>Simple mixin</p></body>""")
     
     test "mixin with params":
         var
@@ -70,7 +70,7 @@ suite "mixins":
             templ = newTemplForMixinWithParams()
         templ.render(ss)
         ss.flush()
-        check ss.data == """<body><p>Content</p></body>"""
+        check diff(ss.data, """<body><p>Content</p></body>""")
     
     test "mixin with content":
         var
@@ -78,7 +78,7 @@ suite "mixins":
             templ = newTemplForMixinWithContent()
         templ.render(ss)
         ss.flush()
-        check ss.data == """<body><div><p>Content</p></div></body>"""
+        check diff(ss.data, """<body><div><p>Content</p></div></body>""")
     
     test "mixin with params and content":
         var
@@ -86,7 +86,8 @@ suite "mixins":
             templ = newTemplForMixinWithParamsAndContent()
         templ.render(ss)
         ss.flush()
-        check ss.data == """<body><h1>Title</h1><div><p>Content</p></div></body>"""
+        check diff(ss.data,
+                """<body><h1>Title</h1><div><p>Content</p></div></body>""")
     
     test "stacked mixins":
         var
@@ -94,4 +95,5 @@ suite "mixins":
             templ = newTemplWithStackedMixins()
         templ.render(ss)
         ss.flush()
-        check ss.data == """<body><div><footer><p>Content</p><p>Author</p></footer></div></body>"""
+        check diff(ss.data,
+                """<body><div><footer><p>Content</p><p>Author</p></footer></div></body>""")

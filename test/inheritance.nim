@@ -1,4 +1,4 @@
-import unittest
+import testbase
 
 include ../src/emerald
 
@@ -58,7 +58,7 @@ suite "inheritance":
             templ = newBaseTempl()
         templ.render(ss)
         ss.flush()
-        check ss.data == """<body><p>Base content</p></body>"""
+        check diff(ss.data, """<body><p>Base content</p></body>""")
 
     test "inheritance with prepend":
         var
@@ -66,7 +66,8 @@ suite "inheritance":
             templ = newPrependChild()
         templ.render(ss)
         ss.flush()
-        check ss.data == """<body><p>Prepended content</p><p>Base content</p></body>"""
+        check diff(ss.data,
+                """<body><p>Prepended content</p><p>Base content</p></body>""")
     
     test "inheritance with replace":
         var 
@@ -74,7 +75,7 @@ suite "inheritance":
             templ = newReplaceChild()
         templ.render(ss)
         ss.flush()
-        check ss.data == """<body><p>Replacing content</p></body>"""
+        check diff(ss.data, """<body><p>Replacing content</p></body>""")
     
     test "inheritance with append":
         var
@@ -82,7 +83,8 @@ suite "inheritance":
             templ = newAppendChild()
         templ.render(ss)
         ss.flush()
-        check ss.data == """<body><p>Base content</p><p>Appended content</p></body>"""
+        check diff(ss.data,
+                """<body><p>Base content</p><p>Appended content</p></body>""")
 
     test "double inheritance with replace and append":
         var
@@ -90,7 +92,8 @@ suite "inheritance":
             templ = newReplaceChildChild()
         templ.render(ss)
         ss.flush()
-        check ss.data == """<body><p>Replacing content</p><p>Appended content</p></body>"""
+        check diff(ss.data,
+             """<body><p>Replacing content</p><p>Appended content</p></body>""")
     
     test "inheritance with template params":
         var
@@ -100,7 +103,7 @@ suite "inheritance":
         templ.num = 2
         templ.render(ss)
         ss.flush()
-        check ss.data == """<head><title>Titel 1</title></head><body><ul><li>1</li><li>2</li></ul><p>Content</p></body>"""
+        check diff(ss.data, """<head><title>Titel 1</title></head><body><ul><li>1</li><li>2</li></ul><p>Content</p></body>""")
     
     test "inheritance with template params in child":
         var
@@ -111,7 +114,7 @@ suite "inheritance":
         templ.content = "Mimimi"
         templ.render(ss)
         ss.flush()
-        check ss.data == """<head><title>Titel 2</title></head><body><ul><li>1</li></ul><p>Mimimi</p></body>"""
+        check diff(ss.data, """<head><title>Titel 2</title></head><body><ul><li>1</li></ul><p>Mimimi</p></body>""")
     
     test "setting parent parameters in child template":
         var
@@ -119,4 +122,4 @@ suite "inheritance":
             templ = newSettingParentParamsInChild()
         templ.render(ss)
         ss.flush()
-        check ss.data == """<head><title>MyTitle</title></head><body><ul><li>1</li><li>2</li><li>3</li></ul><p>Content</p></body>"""
+        check diff(ss.data, """<head><title>MyTitle</title></head><body><ul><li>1</li><li>2</li><li>3</li></ul><p>Content</p></body>""")

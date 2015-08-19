@@ -1,4 +1,4 @@
-import unittest
+import testbase
 
 include ../src/emerald
 
@@ -39,7 +39,7 @@ suite "template parameters":
             templ = newStandaloneParam()
         templ.param = "value"
         templ.render(ss)
-        check ss.data == "value"
+        check diff(ss.data, "value")
     
     test "param in expression":
         var
@@ -47,7 +47,7 @@ suite "template parameters":
             templ = newParamInExpr()
         templ.param = "value"
         templ.render(ss)
-        check ss.data == "foo value"
+        check diff(ss.data, "foo value")
     
     test "param in if condition":
         var
@@ -55,11 +55,11 @@ suite "template parameters":
             templ = newParamInIf()
         templ.param = true
         templ.render(ss)
-        check ss.data == "foo"
+        check diff(ss.data, "foo")
         ss = newStringStream()
         templ.param = false
         templ.render(ss)
-        check ss.data == ""
+        check diff(ss.data, "")
 
     test "param in expression in if condition":
         var 
@@ -67,11 +67,11 @@ suite "template parameters":
             templ = newParamInIfExpr()
         templ.param = true
         templ.render(ss)
-        check ss.data == "foo"
+        check diff(ss.data, "foo")
         ss = newStringStream()
         templ.param = false
         templ.render(ss)
-        check ss.data == ""
+        check diff(ss.data, "")
     
     test "param in attribute value":
         var
@@ -79,7 +79,7 @@ suite "template parameters":
             templ = newParamInAttr()
         templ.param = "value"
         templ.render(ss)
-        check ss.data == "<p id=\"value\"></p>"
+        check diff(ss.data, """<p id="value"></p>""")
     
     test "param in attribute value expression":
         var
@@ -95,4 +95,4 @@ suite "template parameters":
             templ = newParamInProcCall()
         templ.param = "value"
         templ.render(ss)
-        check ss.data == "value"
+        check diff(ss.data, "value")

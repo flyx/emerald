@@ -1,1 +1,2 @@
-import basics, controlStructures, mixins, inheritance, templateParams
+import basics, attributes, controlStructures, mixins, inheritance,
+        templateParams
