@@ -1,7 +1,5 @@
 import testbase
 
-include ../src/emerald
-
 proc base_templ() {. html_templ .} =
     {. compact_mode = true .}
     body:

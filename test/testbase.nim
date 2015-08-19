@@ -1,6 +1,6 @@
-import unittest, strutils
+import unittest, strutils, ../src/emerald
 
-export unittest, strutils
+export unittest, strutils, emerald.html, emerald.filters, emerald.streams
 
 proc diff*(actual, expected: string): bool =
     result = actual.len == expected.len

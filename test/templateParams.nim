@@ -1,7 +1,5 @@
 import testbase
 
-include ../src/emerald
-
 proc standaloneParam(param: string) {.html_templ.} =
     {. compact_mode = true .}
     param

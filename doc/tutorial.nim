@@ -25,20 +25,17 @@ proc tut*() {. html_templ: layout .} =
             figure:
                 {. filters = pygmentize("nim") .}
                 {. preserve_whitespace = true .}
-                "include emerald"
+                "import emerald"
             
                 {. filters = escape_html() .}
                 {. preserve_whitespace = false .}
-                figcaption: "include it."
-            h2: "1. Include "; code("emerald")
+                figcaption: "import it."
+            h2: "1. Import "; code("emerald")
             p:
-                "The "; code("emerald"); """ module contains imports, and only
-                imports, of everything you need to use emerald: The """
-                code("streams"); """ module from the standard library, and the
-                emerald modules """; code("html"); " and "; code("filters")
-                """. You could also import them directly, but as the list of
-                imports you need may change, including """; code("emerald")
-                " is the safest way."
+                "The "; code("emerald"); """ module exports everything you need
+                to use emerald: The """; code("streams"); """ module from the
+                standard library, and the emerald modules """; code("html")
+                " and "; code("filters"); "."
         section:
             figure:
                 {. filters = pygmentize("nim") .}

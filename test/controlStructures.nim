@@ -1,7 +1,5 @@
 import testbase
 
-include ../src/emerald
-
 proc if_test(b1: bool, b2: bool, b3: bool) {.html_templ.} =
     {. compact_mode = true .}
     body:

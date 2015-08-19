@@ -1,7 +1,5 @@
 import testbase
 
-include ../src/emerald
-
 proc simple_mixin() {. html_mixin .} =
     p: "Simple mixin"
 

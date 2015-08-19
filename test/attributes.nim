@@ -1,7 +1,5 @@
 import testbase
 
-include ../src/emerald
-
 proc singleAttribute() {.html_templ.} =
     {.compact_mode = true.}
     d(id="myId"):

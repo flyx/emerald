@@ -1,7 +1,5 @@
 import testbase
 
-include ../src/emerald
-
 import basics_publicTemplate
 
 
