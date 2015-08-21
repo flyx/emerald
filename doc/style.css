@@ -97,6 +97,13 @@ article {
     padding: 0.5em;
     font-family: Palatino,Palatino Linotype,Palatino LT STD,Book Antiqua,Georgia,serif;
 }
+article h1 {
+    font-size: x-large;
+}
+article h2, article h3 {
+    font-size: large;
+}
+
 article p, article dd, article li, footer p {
     line-height: 130%;
 }

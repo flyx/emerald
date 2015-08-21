@@ -1,5 +1,3 @@
-include ../src/emerald
-
 import layout
 
 layout.sites.add((title: "Home", url: "index.html", anchors: @[]))

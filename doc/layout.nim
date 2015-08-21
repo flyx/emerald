@@ -1,4 +1,6 @@
-include ../src/emerald
+import ../src/emerald
+
+export emerald.html, emerald.filters, emerald.streams
 
 type
     anchor* = tuple[caption: string, id: string]

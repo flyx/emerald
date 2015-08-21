@@ -1,5 +1,3 @@
-include ../src/emerald
-
 import layout
 
 layout.sites.add((title: "Documentation", url: "documentation.html",
@@ -275,8 +273,8 @@ proc templ() {.html_templ.} =
                 This cannot be a part of a Nim identifier. Therefore, you must
                 use a """; code("_"); """ instead. So, for example, you have to
                 write """; code("http_equiv"); " instead of "
-                code("http-equiv"); ". Also be aware that attribute names are
-                case and style sensitive."
+                code("http-equiv"); """. Also be aware that attribute names are
+                case and style sensitive."""
             h3(id="data-attributes"): "Data Attributes"
             p:
                 """HTML 5 allows any HTML tag to have an arbitrary number of """
