@@ -1,4 +1,4 @@
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head><title>emerald, a Nim HTML templating engine - Documentation</title><link rel="stylesheet" type="text/css" href="style.css"/><link rel="stylesheet" type="text/css" href="pygments.css"/></head><body><header><h1>emerald</h1><h2>a HTML templating engine for <a href="http://nim-lang.org/">Nim</a></h2></header><main><nav><ul><li class=""><a href="index.html">Home</a></li><li class=""><a href="tutorial.html">Tutorial</a></li><li class="active"><a href="documentation.html">Documentation</a></li><li class="anchor"><a href="#interface">Interface</a></li><li class="anchor"><a href="#tags">Tags</a></li><li class="anchor"><a href="#attributes">Attributes</a></li><li class="anchor"><a href="#content">Text Content</a></li><li class="anchor"><a href="#control">Control Structures</a></li><li class="anchor"><a href="#pragmas">Pragmas</a></li><li class="anchor"><a href="#filters">Filters</a></li><li class="anchor"><a href="#inheritance">Template inheritance</a></li></ul></nav><article><h1>Documentation</h1><section><p>This is the complete documentation of emerald. It explains
+<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head><title>emerald, a Nim HTML templating engine - Documentation</title><link rel="stylesheet" type="text/css" href="style.css"/><link rel="stylesheet" type="text/css" href="pygments.css"/></head><body><header><h1>emerald</h1><h2>a HTML templating engine for <a href="http://nim-lang.org/">Nim</a></h2></header><main><nav><ul><li class=""><a href="index.html">Home</a></li><li class=""><a href="tutorial.html">Tutorial</a></li><li class="active"><a href="documentation.html">Documentation</a></li><li class="anchor"><a href="#interface">Interface</a></li><li class="anchor"><a href="#tags">Tags</a></li><li class="anchor"><a href="#attributes">Attributes</a></li><li class="anchor"><a href="#content">Text Content</a></li><li class="anchor"><a href="#control">Control Structures</a></li><li class="anchor"><a href="#pragmas">Pragmas</a></li><li class="anchor"><a href="#filters">Filters</a></li><li class="anchor"><a href="#inheritance">Template inheritance</a></li><li class=""><a href="changelog.html">Changelog</a></li></ul></nav><article><h1>Documentation</h1><section><p>This is the complete documentation of emerald. It explains
                 all of emerald's features and also explains implementation
                 details, so it is also the developer documentation. The reader
                 is expected to be used to the Nim programming language and its
@@ -6,7 +6,11 @@
                 that emerald writes properly closed HTML tags in all cases, uses
                 quotes for attribute values, and writes a value for boolean
                 attributes where HTML permits the value to be omitted. The goal
-                is for emerald's output to be as robust as possible.</p></section><section><figure><div class="highlight"><pre><span class="k">proc </span><span class="nf">templ</span><span class="p">(</span><span class="n">param</span><span class="p">:</span> <span class="kt">string</span><span class="p">)</span> <span class="p">{.</span><span class="n">html_templ</span><span class="p">.}</span> <span class="o">=</span>
+                is for emerald's output to be as robust as possible.</p><p>Like Nim itself, emerald treats all keywords, commands and
+                procs it declares independently of style and casing, so you can
+                use both <code>mixin_content</code> and <code>mixinContent</code> as you please. HTML tag and
+                attribute names are also parsed case-independently; however,
+                the styling matters here: <code>http_equiv</code> is not the same as <code>httpEquiv</code>.</p></section><section><figure><div class="highlight"><pre><span class="k">proc </span><span class="nf">templ</span><span class="p">(</span><span class="n">param</span><span class="p">:</span> <span class="kt">string</span><span class="p">)</span> <span class="p">{.</span><span class="n">html_templ</span><span class="p">.}</span> <span class="o">=</span>
     <span class="c">#...</span>
 </pre></div>
 <figcaption>input...</figcaption></figure><figure><div class="highlight"><pre><span class="k">type</span> <span class="n">templ</span> <span class="o">=</span> <span class="k">ref</span> <span class="k">object</span> <span class="k">of</span> <span class="n">RootObj</span>
@@ -123,6 +127,10 @@
         <span class="c"># defining classes with dot notation</span>
         <span class="c"># and attribute</span>
         <span class="n">d</span><span class="p">.</span><span class="n">main</span><span class="p">(</span><span class="n">class</span><span class="o">=</span><span class="n">myClass</span><span class="p">)</span>
+        
+        <span class="c"># defining data attributes</span>
+        <span class="k">const</span> <span class="n">varValue</span> <span class="o">=</span> <span class="s">&quot;value2&quot;</span>
+        <span class="n">d</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="p">{</span><span class="s">&quot;key1&quot;</span><span class="p">:</span> <span class="s">&quot;value1&quot;</span><span class="p">,</span> <span class="s">&quot;key2&quot;</span><span class="p">:</span> <span class="n">varValue</span><span class="p">})</span>
 </pre></div>
 <figcaption>set attribute values</figcaption></figure><h2 id="attributes">Attributes</h2><p>For each tag, attributes can be specified in the brackets of
                 the tag call. The name of the attribute comes first, followed by
@@ -135,7 +143,16 @@
                 filtering of normal text, the filtering of attribute values
                 cannot be customized, because there is no use-case for that
                 (please file an issue if you can think of one). Filtering will
-                convert the characters <code>&lt;</code>, <code>&gt;</code>, <code>&amp;</code>, <code>"</code> and <code>'</code> to their corresponding HTML entities.</p></section><section><figure><div class="highlight"><pre><span class="k">proc </span><span class="nf">templ</span><span class="p">()</span> <span class="p">{.</span><span class="n">html_templ</span><span class="p">.}</span> <span class="o">=</span>
+                convert the characters <code>&lt;</code>, <code>&gt;</code>, <code>&amp;</code>, <code>"</code> and <code>'</code> to their corresponding HTML entities.</p><p>Some HTML attributes contain a <code>-</code> in their name.
+                This cannot be a part of a Nim identifier. Therefore, you must
+                use a <code>_</code> instead. So, for example, you have to
+                write <code>http_equiv</code> instead of <code>http-equiv</code>. Also be aware that attribute names are
+                case and style sensitive.</p><h3 id="data-attributes">Data Attributes</h3><p>HTML 5 allows any HTML tag to have an arbitrary number of <em>data</em> attributes, named like this: <code>data-*</code>emerald treats these values as a table, meaning that you can
+                assign the <code>data</code> attribute a <a href="http://nim-lang.org/docs/manual.html#statements-and-expressions-table-constructor">table constructor</a>. This constructor must have string literals as keys, so that
+                emerald can check the validity of the names at compile time - it
+                doesn't make much sense to define the data attribute names with
+                variables anyway. The value of each data attribute may be any
+                expression. The example shows how to set data attributes.</p></section><section><figure><div class="highlight"><pre><span class="k">proc </span><span class="nf">templ</span><span class="p">()</span> <span class="p">{.</span><span class="n">html_templ</span><span class="p">.}</span> <span class="o">=</span>
     <span class="c"># simple string literal</span>
     <span class="s">&quot;Foobar&quot;</span>
     
