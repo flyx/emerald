@@ -1,4 +1,4 @@
-import mainPage, tutorial, documentation, layout
+import mainPage, tutorial, documentation, layout, changelog
 
 import streams, os
 
@@ -11,6 +11,7 @@ var
     mainPageTempl = newHome()
     tutorialTempl = newTut()
     documentationTempl = newDoc()
+    changelogTempl = newChangelog()
 
 echo "generating home.html"
 mainPageTempl.sites = sites
@@ -25,3 +26,8 @@ echo "generating documentation.html"
 fs = newFileStream("site/documentation.html", fmWrite)
 documentationTempl.sites = sites
 documentationTempl.render(fs)
+
+echo "generating changelog.html"
+fs = newFileStream("site/changelog.html", fmWrite)
+changelogTempl.sites = sites
+changelogTempl.render(fs)

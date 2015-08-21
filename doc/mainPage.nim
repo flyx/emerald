@@ -1,5 +1,3 @@
-include ../src/emerald
-
 import layout
 
 layout.sites.add((title: "Home", url: "index.html", anchors: @[]))
@@ -33,7 +31,7 @@ proc home*() {. html_templ: layout .} =
                     templates. You can define your base structure in a master
                     template, and add content with child templates. emerald is
                     still able to check the whole resulting HTML structure."""
-            d:
+            d(id="main-example"):
                 {. filters = pygmentize("nim") .}
                 {. preserve_whitespace = true .}
                 """
@@ -49,7 +47,7 @@ proc templ(youAreUsingEmerald: bool) {.html_templ.} =
         """""" & """
 
     body:
-      h1: "Emerald - Nimrod HTML5 templating engine"
+      h1: "Emerald - Nim HTML5 templating engine"
       d.content:
         if youAreUsingEmerald:
           p: "You are amazing"; br(); "Continue."
@@ -74,7 +72,7 @@ proc templ(youAreUsingEmerald: bool) {.html_templ.} =
             }</script>
     </head>
     <body>
-        <h1>Emerald - Nimrod HTML5 templating engine</h1>
+        <h1>Emerald - Nim HTML5 templating engine</h1>
         <div class="content">
             <p>You are amazing<br/>Continue.</p>
             <p>Emerald is a macro-based type-safe

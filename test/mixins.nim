@@ -1,6 +1,4 @@
-import unittest
-
-include ../src/emerald
+import testbase
 
 proc simple_mixin() {. html_mixin .} =
     p: "Simple mixin"
@@ -9,6 +7,11 @@ proc simple_templ() {. html_templ .} =
     {. compact_mode = true .}
     body:
         call_mixin simple_mixin()
+
+proc different_style_call() {. html_templ .} =
+    {. compact_mode = true .}
+    body:
+        callMixin simple_mixin()
 
 proc mixin_with_params(content: string) {. html_mixin .} =
     p: content
@@ -41,7 +44,7 @@ proc templ_for_mixin_with_params_and_content() {. html_templ .} =
 
 proc inner_mixin() {. html_mixin .} =
     footer:
-        put mixin_content()
+        put mixinContent()
 
 proc outer_mixin() {. html_mixin .} =
     d:
@@ -62,7 +65,15 @@ suite "mixins":
             templ = newSimpleTempl()
         templ.render(ss)
         ss.flush()
-        check ss.data == """<body><p>Simple mixin</p></body>"""
+        check diff(ss.data, """<body><p>Simple mixin</p></body>""")
+    
+    test "call mixin with different style":
+        var
+            ss = newStringStream()
+            templ = newDifferentStyleCall()
+        templ.render(ss)
+        ss.flush()
+        check diff(ss.data, """<body><p>Simple mixin</p></body>""")
     
     test "mixin with params":
         var
@@ -70,7 +81,7 @@ suite "mixins":
             templ = newTemplForMixinWithParams()
         templ.render(ss)
         ss.flush()
-        check ss.data == """<body><p>Content</p></body>"""
+        check diff(ss.data, """<body><p>Content</p></body>""")
     
     test "mixin with content":
         var
@@ -78,7 +89,7 @@ suite "mixins":
             templ = newTemplForMixinWithContent()
         templ.render(ss)
         ss.flush()
-        check ss.data == """<body><div><p>Content</p></div></body>"""
+        check diff(ss.data, """<body><div><p>Content</p></div></body>""")
     
     test "mixin with params and content":
         var
@@ -86,7 +97,8 @@ suite "mixins":
             templ = newTemplForMixinWithParamsAndContent()
         templ.render(ss)
         ss.flush()
-        check ss.data == """<body><h1>Title</h1><div><p>Content</p></div></body>"""
+        check diff(ss.data,
+                """<body><h1>Title</h1><div><p>Content</p></div></body>""")
     
     test "stacked mixins":
         var
@@ -94,4 +106,5 @@ suite "mixins":
             templ = newTemplWithStackedMixins()
         templ.render(ss)
         ss.flush()
-        check ss.data == """<body><div><footer><p>Content</p><p>Author</p></footer></div></body>"""
+        check diff(ss.data,
+                """<body><div><footer><p>Content</p><p>Author</p></footer></div></body>""")

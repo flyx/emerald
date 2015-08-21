@@ -55,7 +55,7 @@ main {
 nav {
     font-size: large;
     background: #eda;
-    min-width: 100px;
+    min-width: 200px;
 }
 nav ul {
     list-style-type: none;
@@ -97,16 +97,23 @@ article {
     padding: 0.5em;
     font-family: Palatino,Palatino Linotype,Palatino LT STD,Book Antiqua,Georgia,serif;
 }
-article p, article dd, article li {
-    line-height: 120%;
+article h1 {
+    font-size: x-large;
+}
+article h2, article h3 {
+    font-size: large;
+}
+
+article p, article dd, article li, footer p {
+    line-height: 130%;
 }
 article p {
-    max-width: 820px;
+    max-width: 720px;
     text-align: justify;
 }
 article ul, article table {
     padding-left: 20px;
-    max-width: 800px;
+    max-width: 700px;
     text-align: justify;
 }
 article div.highlight {
@@ -135,7 +142,7 @@ dt {
 dd {
     margin-bottom: 1em;
     margin-left: 20px;
-    max-width: 800px;
+    max-width: 700px;
     text-align: justify;
 }
 figure {
@@ -146,6 +153,9 @@ figure {
 }
 figure pre {
     text-align: left;
+}
+div#main-example {
+    white-space: nowrap;
 }
 footer {
     padding: 0.2em;

@@ -1,5 +1,3 @@
-include ../src/emerald
-
 import layout
 
 layout.sites.add((title: "Documentation", url: "documentation.html",
@@ -29,6 +27,14 @@ proc doc*() {. html_templ: layout .} =
                 quotes for attribute values, and writes a value for boolean
                 attributes where HTML permits the value to be omitted. The goal
                 is for emerald's output to be as robust as possible."""
+            p:
+                """Like Nim itself, emerald treats all keywords, commands and
+                procs it declares independently of style and casing, so you can
+                use both """; code("mixin_content"); " and "
+                code("mixinContent"); """ as you please. HTML tag and
+                attribute names are also parsed case-independently; however,
+                the styling matters here: """; code("http_equiv")
+                " is not the same as "; code("httpEquiv"); "."
         section:
             figure:
                 {. filters = pygmentize("nim") .}
@@ -231,6 +237,10 @@ proc templ() {.html_templ.} =
         # defining classes with dot notation
         # and attribute
         d.main(class=myClass)
+        
+        # defining data attributes
+        const varValue = "value2"
+        d(data={"key1": "value1", "key2": varValue})
 """
 
                 {. filters = escape_html() .}
@@ -258,6 +268,26 @@ proc templ() {.html_templ.} =
                 convert the characters """; code("<"); ", "; code(">"); ", "
                 code("&"); ", "; code("\""); " and "; code("'")
                 " to their corresponding HTML entities."
+            p:
+                "Some HTML attributes contain a "; code("-"); """ in their name.
+                This cannot be a part of a Nim identifier. Therefore, you must
+                use a """; code("_"); """ instead. So, for example, you have to
+                write """; code("http_equiv"); " instead of "
+                code("http-equiv"); """. Also be aware that attribute names are
+                case and style sensitive."""
+            h3(id="data-attributes"): "Data Attributes"
+            p:
+                """HTML 5 allows any HTML tag to have an arbitrary number of """
+                em("data"); " attributes, named like this: "; code("data-*")
+                """emerald treats these values as a table, meaning that you can
+                assign the """; code("data"); " attribute a "
+                a(href="http://nim-lang.org/docs/manual.html#statements-and-expressions-table-constructor",
+                        "table constructor");
+                """. This constructor must have string literals as keys, so that
+                emerald can check the validity of the names at compile time - it
+                doesn't make much sense to define the data attribute names with
+                variables anyway. The value of each data attribute may be any
+                expression. The example shows how to set data attributes."""
         section:
             figure:
                 {. filters = pygmentize("nim") .}
@@ -335,6 +365,7 @@ proc templ() {.html_templ.} =
 """
                 {. filters = escape_html() .}
                 {. preserve_whitespace = false .}
+                figcaption: "using control structures"
             h2(id="control"): "Control structures"
             p:
                 """Most of Nim's control structures are directly usable in
@@ -376,7 +407,7 @@ proc templ() {.html_templ.} =
                     be indented to the current output indentation, removing any
                     existing indentation. """; em("val"); " may be "
                     code("true"); " or "; code("false"); ", default is "
-                    code("false"); "."; "If "; code("true"); """, the existing
+                    code("false"); ". If "; code("true"); """, the existing
                     whitespace at the beginning of each line for text output
                     will be preserved and no indentation will be applied (
                     regardless of the value of """; code("compact_mode")
