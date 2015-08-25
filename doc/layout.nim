@@ -10,7 +10,6 @@ var sites*: seq[site] = newSeq[site]()
 
 proc layout*(title: string,
              sites: seq[site]) {. html_templ .} =
-    {. compact_mode = true .}
     html(lang="en"):
         head:
             title:
