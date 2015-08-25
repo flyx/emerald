@@ -1,19 +1,72 @@
-<!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head><title>emerald, a Nim HTML templating engine - Home</title><link rel="stylesheet" type="text/css" href="style.css"/><link rel="stylesheet" type="text/css" href="pygments.css"/></head><body><header><h1>emerald</h1><h2>an HTML templating engine for <a href="http://nim-lang.org/">Nim</a></h2></header><main><nav><ul><li class="active"><a href="index.html">Home</a></li><li class=""><a href="tutorial.html">Tutorial</a></li><li class=""><a href="documentation.html">Documentation</a></li><li class=""><a href="changelog.html">Changelog</a></li></ul></nav><article><section><h2>About</h2><p><strong>emerald</strong> is a Nim library for writing <a href="http://www.w3.org/TR/html5/">HTML 5</a> templates. It is implemented as a domain-specific language
-                that can be used directly in your Nim source code via macros.
-                Features include:</p><ul><li><strong>HTML validation</strong>: emerald validates your HTML
-                    structure when it compiles your template. This validation
-                    checks for unknown, ill-placed and missing HTML tags and
-                    attributes, but does not implement the whole HTML 5 spec. It
-                    is a tool for you to discover errors early.</li><li><strong>Mixins</strong>: You can re-use parts of your template
-                    code by placing it in mixins and calling the mixin from the
-                    template. emerald is able to check the whole resulting HTML
-                    structure.</li><li><strong>Filtering</strong>: By default, emerald converts
-                    special HTML characters in the content it outputs to their
-                    corresponding entities, but you can customize the whole
-                    filter chain and also write your own filters.</li><li><strong>Inheritance</strong>: Templates can inherit from other
-                    templates. You can define your base structure in a master
-                    template, and add content with child templates. emerald is
-                    still able to check the whole resulting HTML structure.</li></ul><div id="main-example"><div class="highlight"><pre><span class="k">proc </span><span class="nf">templ</span><span class="p">(</span><span class="n">youAreUsingEmerald</span><span class="p">:</span> <span class="kt">bool</span><span class="p">)</span> <span class="p">{.</span><span class="n">html_templ</span><span class="p">.}</span> <span class="o">=</span>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+    <head>
+        <title>emerald, a Nim HTML templating engine - Home</title>
+        <link rel="stylesheet" type="text/css" href="style.css"/>
+        <link rel="stylesheet" type="text/css" href="pygments.css"/>
+    </head>
+    <body>
+        <header>
+            <h1>emerald</h1>
+            <h2>an HTML templating engine for <a href="http://nim-lang.org/">Nim</a></h2>
+        </header>
+        <main>
+            <nav>
+                <ul>
+                    <li class="active">
+                        <a href="index.html">Home</a>
+                    </li>
+
+                    <li class="">
+                        <a href="tutorial.html">Tutorial</a>
+                    </li>
+
+                    <li class="">
+                        <a href="documentation.html">Documentation</a>
+                    </li>
+
+                    <li class="">
+                        <a href="changelog.html">Changelog</a>
+                    </li>
+                </ul>
+            </nav>
+            <article>
+                <section>
+                    <h2>About</h2>
+                    <p>
+                        <strong>emerald</strong>
+ is a Nim library for writing                         <a href="http://www.w3.org/TR/html5/">HTML 5</a>
+ templates. It is implemented as a domain-specific language
+                        that can be used directly in your Nim source code via macros.
+                        Features include:                    </p>
+                    <ul>
+                        <li>
+                            <strong>HTML validation</strong>
+: emerald validates your HTML
+                            structure when it compiles your template. This validation
+                            checks for unknown, ill-placed and missing HTML tags and
+                            attributes, but does not implement the whole HTML 5 spec. It
+                            is a tool for you to discover errors early.                        </li>
+                        <li>
+                            <strong>Mixins</strong>
+: You can re-use parts of your template
+                            code by placing it in mixins and calling the mixin from the
+                            template. emerald is able to check the whole resulting HTML
+                            structure.                        </li>
+                        <li>
+                            <strong>Filtering</strong>
+: By default, emerald converts
+                            special HTML characters in the content it outputs to their
+                            corresponding entities, but you can customize the whole
+                            filter chain and also write your own filters.                        </li>
+                        <li>
+                            <strong>Inheritance</strong>
+: Templates can inherit from other
+                            templates. You can define your base structure in a master
+                            template, and add content with child templates. emerald is
+                            still able to check the whole resulting HTML structure.                        </li>
+                    </ul>
+                    <div id="main-example"><div class="highlight"><pre><span class="k">proc </span><span class="nf">templ</span><span class="p">(</span><span class="n">youAreUsingEmerald</span><span class="p">:</span> <span class="kt">bool</span><span class="p">)</span> <span class="p">{.</span><span class="n">html_templ</span><span class="p">.}</span> <span class="o">=</span>
   <span class="n">html</span><span class="p">(</span><span class="n">lang</span> <span class="o">=</span> <span class="s">&quot;en&quot;</span><span class="p">):</span>
     <span class="n">head</span><span class="p">:</span>
       <span class="n">title</span><span class="p">:</span> <span class="s">&quot;pageTitle&quot;</span>
@@ -57,15 +110,30 @@
 <span class="nt">&lt;/html&gt;</span>
                 
 </pre></div>
-</div><p>To get started with emerald, have a look at the <a href="tutorial.html">tutorial</a> or learn it the hard way by reading the <a href="documentation.html">documentation</a>.</p></section><section><h2>Project Status &amp; Contributing</h2><p>emerald is currently under development. Its language
-                definition is not finalized yet. All major features are
-                implemented, but it is a bit rough around the edges. Every
-                comment and suggestion how to improve it is welcome, just create
-                an issue on GitHub. Of course, you can also fork emerald hack it
-                yourself.</p><p>This project has been started as proof-of-concept and to
-                test Nim's macro capabilities. It does not have a stable release
-                yet, it only compiles with Nim's development branch, and its
-                implementation contains multiple workarounds for Nim VM bugs.
-                Using it for any serious project is strongly discouraged. This
-                may change in the future.</p><h2>Authors &amp; License</h2><p>emerald has been created by <a href="https://github.com/flyx">Felix Krause</a>, is licensed under the <a href="http://www.wtfpl.net">Do What the Fuck You Want to Public License</a> and can be forked on <a href="https://github.com/flyx/emerald">Github</a>.</p></section></article></main><footer><p>This documentation was generated with emerald.<br/>Its content is, like emerald itself, licensed under the
-                    <a href="http://www.wtfpl.net">WTFPL</a>.</p></footer><a href="https://github.com/flyx/emerald"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://camo.githubusercontent.com/652c5b9acfaddf3a9c326fa6bde407b87f7be0f4/68747470733a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f72696768745f6f72616e67655f6666373630302e706e67" alt="Fork me on GitHub" data-canonical-src="https://s3.amazonaws.com/github/ribbons/forkme_right_orange_ff7600.png"></a></body></html>
+</div>
+                    <p>To get started with emerald, have a look at the <a href="tutorial.html">tutorial</a> or learn it the hard way by reading the <a href="documentation.html">documentation</a>.</p>
+                </section>
+                <section>
+                    <h2>Project Status &amp; Contributing</h2>
+                    <p>emerald is currently under development. Its language
+                        definition is not finalized yet. All major features are
+                        implemented, but it is a bit rough around the edges. Every
+                        comment and suggestion how to improve it is welcome, just create
+                        an issue on GitHub. Of course, you can also fork emerald hack it
+                        yourself.</p>
+                    <p>This project has been started as proof-of-concept and to
+                        test Nim's macro capabilities. It does not have a stable release
+                        yet, it only compiles with Nim's development branch, and its
+                        implementation contains multiple workarounds for Nim VM bugs.
+                        Using it for any serious project is strongly discouraged. This
+                        may change in the future.</p>
+                    <h2>Authors &amp; License</h2>
+                    <p>emerald has been created by <a href="https://github.com/flyx">Felix Krause</a>, is licensed under the <a href="http://www.wtfpl.net">Do What the Fuck You Want to Public License</a> and can be forked on <a href="https://github.com/flyx/emerald">Github</a>.</p>
+                </section>
+</article>
+        </main>
+        <footer>
+            <p>This documentation was generated with emerald.<br/>Its content is, like emerald itself, licensed under the<a href="http://www.wtfpl.net">WTFPL</a>.</p>
+        </footer>
+<a href="https://github.com/flyx/emerald"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://camo.githubusercontent.com/652c5b9acfaddf3a9c326fa6bde407b87f7be0f4/68747470733a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f72696768745f6f72616e67655f6666373630302e706e67" alt="Fork me on GitHub" data-canonical-src="https://s3.amazonaws.com/github/ribbons/forkme_right_orange_ff7600.png"></a>    </body>
+</html>
