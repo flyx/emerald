@@ -1,4 +1,4 @@
-import lexbase, streams, strutils, tables, json, sequtils
+import lexbase, streams, strutils, tables, json, sequtils, os
 
 type
   WhitespaceKind {.pure.} = enum
@@ -461,7 +461,7 @@ proc emeraldDefine(context: Context): Content =
   assert context.symbols[":name"].content.kind == ContentKind.text
   context.parent.symbols[context.symbols[":name"].content.textContent] = newSym
 
-proc writeResultTree(output: var Stream, tree: Content) =
+proc writeResultTree(output: Stream, tree: Content) =
   case tree.kind
   of ContentKind.call: assert false
   of ContentKind.concat:
@@ -479,7 +479,7 @@ proc writeResultTree(output: var Stream, tree: Content) =
   of ContentKind.text:
     output.write(tree.textContent)
 
-proc render*(input: var Stream, output: var Stream, params: JsonNode) =
+proc render*(input: Stream, output: Stream, params: JsonNode) =
   var root = Context(symbols: initTable[string, Symbol](),
                      whitespaceProcessing: true,
                      emeraldChar: '\\')
@@ -523,31 +523,16 @@ proc render*(input: var Stream, output: var Stream, params: JsonNode) =
     #  output.write("\n\n")
     #  output.write(c.textContent)
 
-var input: Stream = newStringStream("""This is  text
-more    text
+let args = commandLineParams()
+if args.len < 1 or args.len > 2:
+  echo "Usage:\n  ", paramStr(0), " <template> [<params>]"
+  quit 1
 
-More text after empty line
-\define("foo"):
-  herpdiderp
-
-\call \another
-
-\call \foo
-\another
-  This is in a section
-  more \with stuff
-  
-  even more
-after section
-
-call not enclosed\third()in whitespace
-""")
+var input = newFileStream(args[0])
+var params = %* {}
+if args.len == 2:
+  params = parseJson(newFileStream(args[1]), args[1])
 
 var output: Stream = newFileStream(stdout)
 
-render(input, output, %* {
-  "call": "foo",
-  "another": "bar",
-  "third": 42,
-  "with": 4.2
-})
+render(input, output, params)
