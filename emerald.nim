@@ -30,7 +30,7 @@ type
   InjectedSymbol = proc(context: Context): Content
 
   ParamKind {.pure.} = enum
-    atom, section, listCollector, mapCollector
+    atom, list, listCollector, mapCollector, varDef, section
 
   ParamDef = object
     kind: ParamKind
@@ -238,9 +238,9 @@ proc executeCall(call: Content, context: Context): Content =
       break
     except KeyError:
       if curContext.parent == nil:
-        raise newException(Exception, "Unknown call target: " & call.name)
+        return call
       curContext = curContext.parent
-  
+    
   # map parameters and setup context
   var callContext = Context(symbols: initTable[string, Symbol](),
       whitespaceProcessing: true, emeraldChar: context.emeraldChar,
@@ -286,7 +286,11 @@ proc executeCall(call: Content, context: Context): Content =
         of ParamKind.listCollector:
           var collectedList = newList()
           for j in listParams:
-            collectedList.items.add(call.params[j].value)
+            let value = call.params[j].value
+            if value.kind == ContentKind.call:
+              collectedList.items.add(executeCall(value, context))
+            else:
+              collectedList.items.add(value)
           callContext.symbols[sym.params[i].name] = Symbol(
               kind: SymbolKind.emerald, params: newSeq[ParamDef](),
               content: collectedList)
@@ -294,14 +298,18 @@ proc executeCall(call: Content, context: Context): Content =
         of ParamKind.mapCollector:
           var collectedMap = newList()
           for j in mapParams:
-            var pair = newList(@[newText(sym.params[j].name),
-                                 call.params[j].value])
+            let value = call.params[j].value
+            var pair = newList(@[newText(call.params[j].name)])
+            if value.kind == ContentKind.call:
+              pair.items.add(executeCall(value, context))
+            else:
+              pair.items.add(value)
             collectedMap.items.add(pair)
           callContext.symbols[sym.params[i].name] = Symbol(
               kind: SymbolKind.emerald, params: newSeq[ParamDef](),
               content: collectedMap)
           mapParams.setLen(0) 
-        of ParamKind.atom, ParamKind.section:
+        of ParamKind.atom, ParamKind.list, ParamKind.section:
           if sym.params[i].default == nil:
             raise newException(Exception,
                 "Missing required parameter: " & sym.params[i].name)
@@ -310,15 +318,39 @@ proc executeCall(call: Content, context: Context): Content =
             callContext.symbols[sym.params[i].name] =
                 Symbol(kind: SymbolKind.emerald, params: newSeq[ParamDef](),
                        content: sym.params[i].default)
+        of ParamKind.varDef:
+          raise newException(Exception,
+              "Missing required parameter: " & sym.params[i].name)
       elif paramMapping[i] == -2:
         callContext.symbols[sym.params[i].name] =
             Symbol(kind: SymbolKind.emerald, params: newSeq[ParamDef](),
                    content: call.section)
       else:
-        assert call.params[paramMapping[i]].value.kind == ContentKind.text
+        var node: Content
+        let param = call.params[paramMapping[i]].value
+        case sym.params[i].kind
+        of ParamKind.atom:
+          if param.kind == ContentKind.call:
+            node = executeCall(param, context)
+          else:
+            node = param
+        of ParamKind.list, ParamKind.section:
+          if param.kind == ContentKind.call:
+            node = executeCall(param, context)
+          else:
+            node = param
+          if node.kind == ContentKind.text:
+            raise newException(Exception, "Expected list as param value")
+        of ParamKind.varDef:
+          if param.kind != ContentKind.call:
+            raise newException(Exception, "Expected a call")
+          elif param.params.len != 0 or param.section != nil:
+            raise newException(Exception, "Expected a call without params")
+          node = param
+        else: assert false
         callContext.symbols[sym.params[i].name] =
             Symbol(kind: SymbolKind.emerald, params: newSeq[ParamDef](),
-                   content: call.params[paramMapping[i]].value)
+                   content: node)
     if listParams.len + mapParams.len != 0:
       raise newException(Exception, "Unknown parameter(s)!")
 
@@ -440,30 +472,33 @@ proc emeraldDefine(context: Context): Content =
   let params = context.symbols[":params"].content
   assert params.kind == ContentKind.list
   for param in params.items:
-    assert params.kind == ContentKind.list
-    assert params.values.len == 2
-    assert params.items[0].kind == ContentKind.text
-    assert params.items[1].kind == ContentKind.text
-    var def = ParamDef(name: params.items[0].textContent)
-    case params.items[1].textContent
+    assert param.kind == ContentKind.list
+    assert param.items.len == 2
+    assert param.items[0].kind == ContentKind.text
+    assert param.items[1].kind == ContentKind.text
+    var def = ParamDef(name: param.items[0].textContent)
+    case param.items[1].textContent
     of "atom":
       def.kind = ParamKind.atom
+    of "list":
+      def.kind = ParamKind.list
+    of "mapC":
+      def.kind = ParamKind.mapCollector
+    of "listC":
+      def.kind = ParamKind.listCollector
     of "section":
       def.kind = ParamKind.section
-    of "map":
-      def.kind = ParamKind.mapCollector
-    of "list":
-      def.kind = ParamKind.listCollector
     else:
       raise newException(Exception, "Invalid param type: " &
-          params.items[1].textContent)
+          param.items[1].textContent)
     newSym.params.add(def)
   assert context.symbols[":name"].content.kind == ContentKind.text
   context.parent.symbols[context.symbols[":name"].content.textContent] = newSym
 
 proc writeResultTree(output: Stream, tree: Content) =
   case tree.kind
-  of ContentKind.call: assert false
+  of ContentKind.call:
+    raise newException(Exception, "Unresolved call to \"" & tree.name & "\"")
   of ContentKind.concat:
     var first = true
     for value in tree.values:
@@ -517,11 +552,6 @@ proc render*(input: Stream, output: Stream, params: JsonNode) =
     let content = iprt.processSection(root)
     assert content.kind == ContentKind.list
     writeResultTree(output, content)
-    #echo $content
-    #for c in content.items:
-    #  assert c.kind == ContentKind.text
-    #  output.write("\n\n")
-    #  output.write(c.textContent)
 
 let args = commandLineParams()
 if args.len < 1 or args.len > 2:
