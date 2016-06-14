@@ -2,7 +2,7 @@ import lexbase, streams, strutils, tables, json, sequtils
 
 type
   ContentKind {.pure.} = enum
-    text, callRef
+    text, call, list
   
   Param = object
     name: string
@@ -15,18 +15,18 @@ type
     case kind: ContentKind
     of ContentKind.text:
       textContent: string
-    of ContentKind.callRef:
+    of ContentKind.call:
       name: string
       params: seq[Param]
-      section: Section
+      section: Content
+    of ContentKind.list:
+      values: seq[Content]
     before: WhitespaceKind
-  
-  Section = seq[Content]
   
   SymbolKind {.pure.} = enum
     emerald, injected
     
-  InjectedSymbol = proc(context: Context): Section
+  InjectedSymbol = proc(context: Context): Content
 
   ParamDef = object
     name: string
@@ -36,7 +36,7 @@ type
     params: seq[ParamDef]
     case kind: SymbolKind
     of SymbolKind.emerald:
-      content: Section
+      content: Content
     of SymbolKind.injected:
       impl: InjectedSymbol
   
@@ -54,8 +54,6 @@ type
 
 proc toString(val: Content, indent: int): string
   
-proc toString(val: Section, indent: int): string
-
 proc toString(val: Param, indent: int): string =
   result = repeat(' ', indent)
   if isNil(val.name):
@@ -69,20 +67,18 @@ proc toString(val: Content, indent: int): string =
   case val.kind
   of ContentKind.text:
     result.add("text:\n" & repeat(' ', indent + 2) & val.textContent & "\n")
-  of ContentKind.callRef:
+  of ContentKind.call:
     result.add("call(" & val.name & "):\n")
     for param in val.params:
       result.add(toString(param, indent + 2))
     if not isNil(val.section):
       result.add(repeat(' ', indent + 2) & "section:\n")
       result.add(toString(val.section, indent + 4))
+  of ContentKind.list:
+    for item in val.values:
+      result.add(toString(item, indent))
     
-proc toString(val: Section, indent: int): string =
-  result = ""
-  for item in val:
-    result.add(toString(item, indent))
-
-proc `$`*(val: Section): string = val.toString(0)
+proc `$`*(val: Content): string = val.toString(0)
 
 proc indentation(lex: var BaseLexer): int =
   result = 0
@@ -118,7 +114,7 @@ proc processString(lex: var BaseLexer): Content =
   if lex.buf[lex.bufpos] != '\"':
     raise newException(Exception, "Unclosed string")
 
-proc processSection(iprt: var Interpreter, context: Context): Section
+proc processSection(iprt: var Interpreter, context: Context): Content
 
 proc processCallParams(iprt: var Interpreter, params: var seq[Param]) =
   assert iprt.lex.buf[iprt.lex.bufpos] == '('
@@ -147,7 +143,7 @@ proc processCallParams(iprt: var Interpreter, params: var seq[Param]) =
       if itemName.len == 0:
         raise newException(Exception, "Missing call name")
       var param = Param(name: paramName, value:
-          Content(kind: ContentKind.callRef, name: itemName,
+          Content(kind: ContentKind.call, name: itemName,
                       params: newSeq[Param](), before: WhitespaceKind.none))
       iprt.processCallParams(param.value.params)
       params.add(param)
@@ -161,7 +157,7 @@ proc processCallParams(iprt: var Interpreter, params: var seq[Param]) =
       iprt.lex.skipWhitespace()
     else:
       params.add(Param(name: paramName, value:
-          Content(kind: ContentKind.callRef, name: itemName,
+          Content(kind: ContentKind.call, name: itemName,
                       params: newSeq[Param](), before: WhitespaceKind.none)))
     if iprt.lex.buf[iprt.lex.bufpos] notin {',', ')'}:
       raise newException(Exception, "Invalid content")
@@ -186,8 +182,22 @@ proc skipUntilNextContent(iprt: var Interpreter, firstLinebreakIsMajor: bool) =
       iprt.curWhitespace = WhitespaceKind.major
     iprt.curIndent = iprt.lex.indentation()
 
-proc executeCall(target: var Section, call: Content, context: Context) =
-  assert call.kind == ContentKind.callRef
+proc executeCall(target: Content, call: Content, context: Context)
+
+proc execute(subject: Content, target: Content, context: Context) =
+  assert target.kind == ContentKind.list
+  case subject.kind
+  of ContentKind.text:
+    target.values.add(subject)
+  of ContentKind.call:
+    executeCall(target, subject, context)
+  of ContentKind.list:
+    for item in subject.values:
+      execute(item, target, context)
+
+proc executeCall(target: Content, call: Content, context: Context) =
+  assert call.kind == ContentKind.call
+  assert target.kind == ContentKind.list
   var curContext = context
   var sym: Symbol
   while true:
@@ -241,7 +251,7 @@ proc executeCall(target: var Section, call: Content, context: Context) =
           assert sym.params[i].default.kind == ContentKind.text
           callContext.symbols[sym.params[i].name] =
               Symbol(kind: SymbolKind.emerald, params: newSeq[ParamDef](),
-                     content: @[sym.params[i].default])
+                     content: sym.params[i].default)
       elif paramMapping[i] == -2:
         callContext.symbols[sym.params[i].name] =
             Symbol(kind: SymbolKind.emerald, params: newSeq[ParamDef](),
@@ -250,26 +260,20 @@ proc executeCall(target: var Section, call: Content, context: Context) =
         assert call.params[paramMapping[i]].value.kind == ContentKind.text
         callContext.symbols[sym.params[i].name] =
             Symbol(kind: SymbolKind.emerald, params: newSeq[ParamDef](),
-                   content: @[call.params[paramMapping[i]].value])
+                   content: call.params[paramMapping[i]].value)
   
   # execute call
-  var contentToAdd: Section
+  var contentToAdd: Content
   if sym.kind == SymbolKind.emerald:
     contentToAdd = sym.content
   else:
     contentToAdd = sym.impl(callContext)
-  if sym.content.len > 0:
-    sym.content[0].before = call.before
-  for content in sym.content:
-    case content.kind
-    of ContentKind.text:
-      target.add(content)
-    of ContentKind.callRef:
-      executeCall(target, content, callContext)
+  contentToAdd.before = call.before
+  execute(contentToAdd, target, callContext)
 
 proc processCall(iprt: var Interpreter, context: Context): Content =
   assert iprt.lex.buf[iprt.lex.bufpos] == context.emeraldChar
-  result = Content(kind: ContentKind.callRef, name: "",
+  result = Content(kind: ContentKind.call, name: "",
                        params: newSeq[Param](), before: iprt.curWhitespace)
   iprt.curWhitespace = WhitespaceKind.none
   inc(iprt.lex.bufpos)
@@ -346,18 +350,18 @@ proc processText(iprt: var Interpreter, context: Context): Content =
         iprt.curWhitespace == WhitespaceKind.major: break
     result.textContent.add(' ')
 
-proc processSection(iprt: var Interpreter, context: Context): Section =
-  result = newSeq[Content]()
+proc processSection(iprt: var Interpreter, context: Context): Content =
+  result = Content(kind: ContentKind.list, values: newSeq[Content]())
   while iprt.curIndent >= iprt.indent[iprt.indent.high]:
     if iprt.lex.buf[iprt.lex.bufpos] == context.emeraldChar:
       let call = iprt.processCall(context)
       executeCall(result, call, context)
     else:
-      result.add(iprt.processText(context))
+      result.values.add(iprt.processText(context))
     if iprt.lex.buf[iprt.lex.bufpos] == EndOfFile: break
 
-proc emeraldDefine(context: Context): Section =
-  result = 
+proc emeraldDefine(context: Context): Content =
+  result = Content(kind: ContentKind.list, values: newSeq[Content]())
 
 proc render*(input: var Stream, output: var Stream, params: JsonNode) =
   var root = Context(symbols: initTable[string, Symbol](),
@@ -369,18 +373,18 @@ proc render*(input: var Stream, output: var Stream, params: JsonNode) =
     of JString:
       root.symbols[key] =
           Symbol(params: newSeq[ParamDef](), kind: SymbolKind.emerald,
-                 content: @[Content(kind: ContentKind.text,
-                                    textContent: value.str)])
+                 content: Content(kind: ContentKind.text,
+                                    textContent: value.str))
     of JInt:
       root.symbols[key] =
           Symbol(params: newSeq[ParamDef](), kind: SymbolKind.emerald,
-                 content: @[Content(kind: ContentKind.text,
-                                    textContent: $value.num)])
+                 content: Content(kind: ContentKind.text,
+                                    textContent: $value.num))
     of JFloat:
       root.symbols[key] =
           Symbol(params: newSeq[ParamDef](), kind: SymbolKind.emerald,
-                 content: @[Content(kind: ContentKind.text,
-                                    textContent: $value.fnum)])
+                 content: Content(kind: ContentKind.text,
+                                    textContent: $value.fnum))
     else:
       raise newException(Exception, "Unsupported value kind: " & $value.kind)
   var iprt = Interpreter(indent: newSeq[int](),
@@ -390,7 +394,8 @@ proc render*(input: var Stream, output: var Stream, params: JsonNode) =
   if iprt.lex.buf[iprt.lex.bufpos] != EndOfFile:
     iprt.indent.add(iprt.curIndent)
     let content = iprt.processSection(root)
-    for c in content:
+    assert content.kind == ContentKind.list
+    for c in content.values:
       assert c.kind == ContentKind.text
       case c.before
       of WhitespaceKind.none: discard
