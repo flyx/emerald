@@ -28,7 +28,11 @@ type
     
   InjectedSymbol = proc(context: Context): Content
 
+  ParamKind {.pure.} = enum
+    atom, section, listCollector, mapCollector
+
   ParamDef = object
+    kind: ParamKind
     name: string
     default: Content
 
@@ -66,9 +70,10 @@ proc toString(val: Content, indent: int): string =
   result = repeat(' ', indent)
   case val.kind
   of ContentKind.text:
-    result.add("text:\n" & repeat(' ', indent + 2) & val.textContent & "\n")
+    result.add("text[before=" & $val.before & "]:\n" &
+        repeat(' ', indent + 2) & val.textContent & "\n")
   of ContentKind.call:
-    result.add("call(" & val.name & "):\n")
+    result.add("call[before=" & $val.before & "](" & val.name & "):\n")
     for param in val.params:
       result.add(toString(param, indent + 2))
     if not isNil(val.section):
@@ -192,7 +197,11 @@ proc execute(subject: Content, target: Content, context: Context) =
   of ContentKind.call:
     executeCall(target, subject, context)
   of ContentKind.list:
+    var first = true
     for item in subject.values:
+      if first:
+        first = false
+        item.before = subject.before
       execute(item, target, context)
 
 proc executeCall(target: Content, call: Content, context: Context) =
@@ -218,8 +227,11 @@ proc executeCall(target: Content, call: Content, context: Context) =
     if call.params.len > 0:
       raise newException(Exception, "Call takes no parameters")
   else:
-    var paramMapping = repeat(-1, sym.params.high)
-    var paramIndex = 0
+    var
+      paramMapping = repeat(-1, sym.params.len)
+      paramIndex = 0
+      listParams = newSeq[int]()
+      mapParams = newSeq[int]()
     for i in 0..call.params.high:
       block searchParam:
         if not isNil(call.params[i].name):
@@ -229,29 +241,55 @@ proc executeCall(target: Content, call: Content, context: Context) =
                 paramMapping[j] = i
                 if j == paramIndex: break searchNamedParam
                 else: break searchParam
-            raise newException(Exception,
-                               "Unknown parameter: " & call.params[i].name)
+            mapParams.add(i)
         elif paramIndex > paramMapping.high:
-          raise newException(Exception, "Too many parameters!")
+          listParams.add(i)
         else:
           paramMapping[paramIndex] = i
-        while paramIndex < paramMapping.high and paramMapping[paramIndex] != -1:
+        while paramIndex < paramMapping.high and (
+            paramMapping[paramIndex] != -1 or
+            sym.params[paramIndex].kind != ParamKind.atom):
           inc(paramIndex)
     if call.section != nil:
-      if paramMapping[paramMapping.high] != -1:
-        raise newException(Exception,
-            "Section given, but last param already set")
-      paramMapping[paramMapping.high] = -2
+      block searchSectionParam:
+        for i in 0 .. sym.params.high:
+          if sym.params[i].kind == ParamKind.section and paramMapping[i] == -1:
+            paramMapping[i] = -2
+            break searchSectionParam
+        raise newException(Exception, "Cannot map section to a parameter") 
     for i in 0 .. paramMapping.high:
       if paramMapping[i] == -1:
-        if sym.params[i].default == nil:
-          raise newException(Exception,
-              "Missing required parameter: " & sym.params[i].name)
-        else:
-          assert sym.params[i].default.kind == ContentKind.text
-          callContext.symbols[sym.params[i].name] =
-              Symbol(kind: SymbolKind.emerald, params: newSeq[ParamDef](),
-                     content: sym.params[i].default)
+        case sym.params[i].kind
+        of ParamKind.listCollector:
+          var collectedList =
+              Content(kind: ContentKind.list, values: newSeq[Content]())
+          for j in listParams:
+            collectedList.values.add(call.params[j].value)
+          callContext.symbols[sym.params[i].name] = Symbol(
+              kind: SymbolKind.emerald, params: newSeq[ParamDef](),
+              content: collectedList)
+          listParams.setLen(0)
+        of ParamKind.mapCollector:
+          var collectedMap =
+              Content(kind: ContentKind.list, values: newSeq[Content]())
+          for j in mapParams:
+            var pair = Content(kind: ContentKind.list, values: @[
+              Content(kind: ContentKind.text, textContent: sym.params[j].name),
+              call.params[j].value])
+            collectedMap.values.add(pair)
+          callContext.symbols[sym.params[i].name] = Symbol(
+              kind: SymbolKind.emerald, params: newSeq[ParamDef](),
+              content: collectedMap)
+          mapParams.setLen(0) 
+        of ParamKind.atom, ParamKind.section:
+          if sym.params[i].default == nil:
+            raise newException(Exception,
+                "Missing required parameter: " & sym.params[i].name)
+          else:
+            assert sym.params[i].default.kind == ContentKind.text
+            callContext.symbols[sym.params[i].name] =
+                Symbol(kind: SymbolKind.emerald, params: newSeq[ParamDef](),
+                       content: sym.params[i].default)
       elif paramMapping[i] == -2:
         callContext.symbols[sym.params[i].name] =
             Symbol(kind: SymbolKind.emerald, params: newSeq[ParamDef](),
@@ -261,7 +299,9 @@ proc executeCall(target: Content, call: Content, context: Context) =
         callContext.symbols[sym.params[i].name] =
             Symbol(kind: SymbolKind.emerald, params: newSeq[ParamDef](),
                    content: call.params[paramMapping[i]].value)
-  
+    if listParams.len + mapParams.len != 0:
+      raise newException(Exception, "Unknown parameter(s)!")
+
   # execute call
   var contentToAdd: Content
   if sym.kind == SymbolKind.emerald:
@@ -301,6 +341,7 @@ proc processCall(iprt: var Interpreter, context: Context): Content =
     if iprt.curIndent <= iprt.indent[iprt.indent.high]:
       raise newException(Exception, "Missing section content")
     iprt.indent.add(iprt.curIndent)
+    iprt.curWhitespace = WhitespaceKind.none
     result.section = iprt.processSection(
         Context(symbols: initTable[string, Symbol](),
                 whitespaceProcessing: true,
@@ -362,6 +403,32 @@ proc processSection(iprt: var Interpreter, context: Context): Content =
 
 proc emeraldDefine(context: Context): Content =
   result = Content(kind: ContentKind.list, values: newSeq[Content]())
+  var newSym = Symbol(params: newSeq[ParamDef](), kind: SymbolKind.emerald,
+                      content: context.symbols[":content"].content)
+  assert context.parent != nil
+  let params = context.symbols[":params"].content
+  assert params.kind == ContentKind.list
+  for param in params.values:
+    assert params.kind == ContentKind.list
+    assert params.values.len == 2
+    assert params.values[0].kind == ContentKind.text
+    assert params.values[1].kind == ContentKind.text
+    var def = ParamDef(name: params.values[0].textContent)
+    case params.values[1].textContent
+    of "atom":
+      def.kind = ParamKind.atom
+    of "section":
+      def.kind = ParamKind.section
+    of "map":
+      def.kind = ParamKind.mapCollector
+    of "list":
+      def.kind = ParamKind.listCollector
+    else:
+      raise newException(Exception, "Invalid param type: " &
+          params.values[1].textContent)
+    newSym.params.add(def)
+  assert context.symbols[":name"].content.kind == ContentKind.text
+  context.parent.symbols[context.symbols[":name"].content.textContent] = newSym
 
 proc render*(input: var Stream, output: var Stream, params: JsonNode) =
   var root = Context(symbols: initTable[string, Symbol](),
@@ -387,6 +454,11 @@ proc render*(input: var Stream, output: var Stream, params: JsonNode) =
                                     textContent: $value.fnum))
     else:
       raise newException(Exception, "Unsupported value kind: " & $value.kind)
+  root.symbols["define"] =
+      Symbol(params: @[ParamDef(name: ":name", kind: ParamKind.atom),
+                       ParamDef(name: ":params", kind: ParamKind.mapCollector),
+                       ParamDef(name: ":content", kind: ParamKind.section)],
+             kind: SymbolKind.injected, impl: emeraldDefine)
   var iprt = Interpreter(indent: newSeq[int](),
                          curWhitespace: WhitespaceKind.none)
   iprt.lex.open(input)
@@ -407,7 +479,12 @@ var input: Stream = newStringStream("""This is  text
 more    text
 
 More text after empty line
-\call
+\define("foo"):
+  herpdiderp
+
+\call \another
+
+\call \foo
 \another
   This is in a section
   more \with stuff
