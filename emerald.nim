@@ -103,6 +103,9 @@ proc newConcat(first: Content = nil): Content =
   if first != nil:
     result.values.add((whitespace: false, node: first))
 
+proc newSymbol(content: Content): Symbol =
+  Symbol(params: newSeq[ParamDef](), kind: SymbolKind.emerald, content: content)
+
 proc indentation(lex: var BaseLexer): int =
   result = 0
   while lex.buf[lex.bufpos] == ' ':
@@ -271,11 +274,14 @@ proc executeCall(call: Content, context: Context): Content =
           paramMapping[paramIndex] = i
         while paramIndex < paramMapping.high and (
             paramMapping[paramIndex] != -1 or
-            sym.params[paramIndex].kind != ParamKind.atom):
+            sym.params[paramIndex].kind in
+                {ParamKind.listCollector, ParamKind.mapCollector}):
           inc(paramIndex)
     if call.section != nil:
       block searchSectionParam:
         for i in 0 .. sym.params.high:
+          echo "trying index ", i, ": kind=", sym.params[i].kind, ", mapping=",
+              paramMapping[i]
           if sym.params[i].kind == ParamKind.section and paramMapping[i] == -1:
             paramMapping[i] = -2
             break searchSectionParam
@@ -357,10 +363,10 @@ proc executeCall(call: Content, context: Context): Content =
   # execute call
   var contentToAdd: Content
   if sym.kind == SymbolKind.emerald:
-    contentToAdd = sym.content
+    result = execute(sym.content, callContext)
   else:
-    contentToAdd = sym.impl(callContext)
-  result = execute(contentToAdd, callContext)
+    result = sym.impl(callContext)
+  
 
 proc processCall(iprt: var Interpreter, context: Context): Content =
   assert iprt.lex.buf[iprt.lex.bufpos] == context.emeraldChar
@@ -495,6 +501,26 @@ proc emeraldDefine(context: Context): Content =
   assert context.symbols[":name"].content.kind == ContentKind.text
   context.parent.symbols[context.symbols[":name"].content.textContent] = newSym
 
+proc emeraldFor(context: Context): Content =
+  
+  let variable = context.symbols[":var"].content
+  assert variable.kind == ContentKind.call
+  let iterable = context.symbols[":iterable"].content
+  echo $iterable
+  let content = context.symbols[":section"].content
+  if iterable.kind == ContentKind.call:
+    result = Content(kind: ContentKind.call, name: "for", params: @[
+        Param(name: ":var", value: variable),
+        Param(name: ":iterable", value: iterable),
+        Param(name: ":section", value: content)])
+  else:
+    result = newList()
+    for item in iterable.items:
+      echo "item:"
+      echo $item
+      context.symbols[variable.name] = newSymbol(item)
+      result.items.add(execute(content, context))
+
 proc writeResultTree(output: Stream, tree: Content) =
   case tree.kind
   of ContentKind.call:
@@ -514,35 +540,40 @@ proc writeResultTree(output: Stream, tree: Content) =
   of ContentKind.text:
     output.write(tree.textContent)
 
+proc contentFromJson(node: JsonNode): Content =
+  case node.kind
+  of JString: result = newText(node.str)
+  of JInt: result = newText($node.num)
+  of JFloat: result = newText($node.fnum)
+  of JArray:
+    result = newList()
+    for elem in node.elems:
+      result.items.add(contentFromJson(elem))
+  of JObject:
+    result = newList()
+    for key, value in node.fields.pairs():
+      result.items.add(newList(@[newText(key), contentFromJson(value)]))
+  else:
+    raise newException(Exception, "Unsupported JSON node kind: " & $node.kind)
+
 proc render*(input: Stream, output: Stream, params: JsonNode) =
   var root = Context(symbols: initTable[string, Symbol](),
                      whitespaceProcessing: true,
                      emeraldChar: '\\')
   assert params.kind == JObject
   for key, value in params.pairs():
-    case value.kind
-    of JString:
-      root.symbols[key] =
-          Symbol(params: newSeq[ParamDef](), kind: SymbolKind.emerald,
-                 content: Content(kind: ContentKind.text,
-                                    textContent: value.str))
-    of JInt:
-      root.symbols[key] =
-          Symbol(params: newSeq[ParamDef](), kind: SymbolKind.emerald,
-                 content: Content(kind: ContentKind.text,
-                                    textContent: $value.num))
-    of JFloat:
-      root.symbols[key] =
-          Symbol(params: newSeq[ParamDef](), kind: SymbolKind.emerald,
-                 content: Content(kind: ContentKind.text,
-                                    textContent: $value.fnum))
-    else:
-      raise newException(Exception, "Unsupported value kind: " & $value.kind)
+    root.symbols[key] = newSymbol(contentFromJson(value))
+      
   root.symbols["define"] =
       Symbol(params: @[ParamDef(name: ":name", kind: ParamKind.atom),
                        ParamDef(name: ":params", kind: ParamKind.mapCollector),
                        ParamDef(name: ":content", kind: ParamKind.section)],
              kind: SymbolKind.injected, impl: emeraldDefine)
+  root.symbols["for"] =
+      Symbol(params: @[ParamDef(name: ":var", kind: ParamKind.varDef),
+                       ParamDef(name: ":iterable", kind: ParamKind.list),
+                       ParamDef(name: ":section", kind: ParamKind.section)],
+             kind: SymbolKind.injected, impl: emeraldFor)
   var iprt = Interpreter(indent: newSeq[int](),
                          curWhitespace: WhitespaceKind.none)
   iprt.lex.open(input)
