@@ -45,17 +45,30 @@ type
     of SymbolKind.injected:
       impl: InjectedSymbol
   
+  EnclosedProc = ref object
+    opening: string
+    closing: string
+    param: string
+    impl: Content
+  
   Context = ref object
     symbols: Table[string, Symbol]
     whitespaceProcessing: bool
     emeraldChar: char
     parent: Context
+    enclosed: seq[EnclosedProc]
   
   Interpreter = ref object
     lex: BaseLexer
     indent: seq[int]
     curIndent: int
     curWhitespace: WhitespaceKind
+    curMarkupSequence: string
+    expectedClosing: seq[string]
+
+const markupSymbols = {'!', '\"', '#', '$', '%', '&', '\'', '(', ')', '*', '+',
+                       '-', ',', '.', '/', ':', ';', '<', '>', '=', '?', '@',
+                       '[', ']', '^', '_', '`', '{', '|', '}', '~'}
 
 proc toString(val: Content, indent: int): string
   
@@ -105,6 +118,12 @@ proc newConcat(first: Content = nil): Content =
 
 proc newSymbol(content: Content): Symbol =
   Symbol(params: newSeq[ParamDef](), kind: SymbolKind.emerald, content: content)
+
+proc childContext(source: Context): Context =
+  Context(symbols: initTable[string, Symbol](),
+          whitespaceProcessing: source.whitespaceProcessing,
+          emeraldChar: source.emeraldChar, parent: source,
+          enclosed: newSeq[EnclosedProc]())
 
 proc indentation(lex: var BaseLexer): int =
   result = 0
@@ -185,7 +204,8 @@ proc processCallParams(iprt: var Interpreter, params: var seq[Param]) =
           Content(kind: ContentKind.call, name: itemName,
                       params: newSeq[Param]())))
     if iprt.lex.buf[iprt.lex.bufpos] notin {',', ')'}:
-      raise newException(Exception, "Invalid content")
+      raise newException(Exception,
+          "Invalid content: '" & iprt.lex.buf[iprt.lex.bufpos] & "'")
     if iprt.lex.buf[iprt.lex.bufpos] == ')': break
     inc(iprt.lex.bufpos)
     iprt.lex.skipWhitespace()
@@ -247,7 +267,7 @@ proc executeCall(call: Content, context: Context): Content =
   # map parameters and setup context
   var callContext = Context(symbols: initTable[string, Symbol](),
       whitespaceProcessing: true, emeraldChar: context.emeraldChar,
-      parent: context)
+      parent: context, enclosed: newSeq[EnclosedProc]())
   
   if sym.params.len == 0:
     if call.params.len > 0:
@@ -280,8 +300,6 @@ proc executeCall(call: Content, context: Context): Content =
     if call.section != nil:
       block searchSectionParam:
         for i in 0 .. sym.params.high:
-          echo "trying index ", i, ": kind=", sym.params[i].kind, ", mapping=",
-              paramMapping[i]
           if sym.params[i].kind == ParamKind.section and paramMapping[i] == -1:
             paramMapping[i] = -2
             break searchSectionParam
@@ -402,7 +420,8 @@ proc processCall(iprt: var Interpreter, context: Context): Content =
     result.section = iprt.processSection(
         Context(symbols: initTable[string, Symbol](),
                 whitespaceProcessing: true,
-                emeraldChar: context.emeraldChar, parent: context))
+                emeraldChar: context.emeraldChar, parent: context,
+                enclosed: newSeq[EnclosedProc]()))
     discard iprt.indent.pop()
   else:
     iprt.skipUntilNextContent(false)
@@ -413,8 +432,26 @@ proc processText(iprt: var Interpreter, context: Context): Content =
   while true:
     while iprt.lex.buf[iprt.lex.bufpos] notin
         {' ', '\t', '\l', '\c', EndOfFile, context.emeraldChar}:
-      result.textContent.add(iprt.lex.buf[iprt.lex.bufpos])
-      inc(iprt.lex.bufpos)
+      if iprt.lex.buf[iprt.lex.bufpos] in markupSymbols:
+        iprt.curMarkupSequence.add(iprt.lex.buf[iprt.lex.bufpos])
+        inc(iprt.lex.bufpos)
+        if iprt.expectedClosing.len > 0 and iprt.curMarkupSequence ==
+            iprt.expectedClosing[iprt.expectedClosing.high]:
+          return result
+        while iprt.lex.buf[iprt.lex.bufpos] in markupSymbols:
+          iprt.curMarkupSequence.add(iprt.lex.buf[iprt.lex.bufpos])
+          inc(iprt.lex.bufpos)
+          if iprt.expectedClosing.len > 0 and iprt.curMarkupSequence ==
+              iprt.expectedClosing[iprt.expectedClosing.high]:
+            return result
+        for enclosed in context.enclosed:
+          if iprt.curMarkupSequence == enclosed.opening:
+            return result
+        result.textContent.add(iprt.curMarkupSequence)
+        iprt.curMarkupSequence.setLen(0)
+      else:
+        result.textContent.add(iprt.lex.buf[iprt.lex.bufpos])
+        inc(iprt.lex.bufpos)
     while iprt.lex.buf[iprt.lex.bufpos] in {' ', '\t'}:
       iprt.curWhitespace = WhitespaceKind.minor
       inc(iprt.lex.bufpos)
@@ -457,7 +494,24 @@ proc processSection(iprt: var Interpreter, context: Context): Content =
         current = nil
     let whitespace = iprt.curWhitespace == WhitespaceKind.minor
     var node: Content
-    if iprt.lex.buf[iprt.lex.bufpos] == context.emeraldChar:
+    if iprt.curMarkupSequence.len > 0:
+      if iprt.expectedClosing.len > 0 and iprt.curMarkupSequence ==
+          iprt.expectedClosing[iprt.expectedClosing.high]:
+        break
+      for enclosed in context.enclosed:
+        if enclosed.opening == iprt.curMarkupSequence:
+          iprt.expectedClosing.add(enclosed.closing)
+          iprt.curMarkupSequence.setLen(0)
+          var markupContext = childContext(context)
+          markupContext.symbols[enclosed.param] =
+              newSymbol(iprt.processSection(context))
+          node = execute(enclosed.impl, markupContext)
+          if iprt.curMarkupSequence != enclosed.closing:
+            raise newException(Exception,
+                "Missing markup end: " & enclosed.closing)
+          iprt.curMarkupSequence.setLen(0)
+          discard iprt.expectedClosing.pop()
+    elif iprt.lex.buf[iprt.lex.bufpos] == context.emeraldChar:
       node = executeCall(iprt.processCall(context), context)
     else:
       node = iprt.processText(context)
@@ -502,12 +556,12 @@ proc emeraldDefine(context: Context): Content =
   context.parent.symbols[context.symbols[":name"].content.textContent] = newSym
 
 proc emeraldFor(context: Context): Content =
-  
-  let variable = context.symbols[":var"].content
+  result = newList()
+  let
+    variable = context.symbols[":var"].content
+    iterable = context.symbols[":iterable"].content
+    content = context.symbols[":section"].content
   assert variable.kind == ContentKind.call
-  let iterable = context.symbols[":iterable"].content
-  echo $iterable
-  let content = context.symbols[":section"].content
   if iterable.kind == ContentKind.call:
     result = Content(kind: ContentKind.call, name: "for", params: @[
         Param(name: ":var", value: variable),
@@ -516,10 +570,30 @@ proc emeraldFor(context: Context): Content =
   else:
     result = newList()
     for item in iterable.items:
-      echo "item:"
-      echo $item
       context.symbols[variable.name] = newSymbol(item)
       result.items.add(execute(content, context))
+
+proc emeraldMarkup(context: Context): Content =
+  let
+    command = context.symbols["command"].content
+    content = context.symbols["content"].content
+    section = context.symbols["section"].content
+  assert command.kind == ContentKind.text
+  assert content.kind == ContentKind.call
+  assert context.parent != nil
+  case command.textContent
+  of "enclosed":
+    let
+      opening = context.symbols["opening"].content
+      closing = context.symbols["closing"].content
+    assert opening.kind == ContentKind.text
+    assert closing.kind == ContentKind.text
+    context.parent.enclosed.add(EnclosedProc(
+        opening: opening.textContent, closing: closing.textContent,
+        param: content.name, impl: section))
+  else:
+    raise newException(Exception,
+        "Unknown markup commando: " & command.textContent)
 
 proc writeResultTree(output: Stream, tree: Content) =
   case tree.kind
@@ -559,7 +633,7 @@ proc contentFromJson(node: JsonNode): Content =
 proc render*(input: Stream, output: Stream, params: JsonNode) =
   var root = Context(symbols: initTable[string, Symbol](),
                      whitespaceProcessing: true,
-                     emeraldChar: '\\')
+                     emeraldChar: '\\', enclosed: newSeq[EnclosedProc]())
   assert params.kind == JObject
   for key, value in params.pairs():
     root.symbols[key] = newSymbol(contentFromJson(value))
@@ -574,8 +648,17 @@ proc render*(input: Stream, output: Stream, params: JsonNode) =
                        ParamDef(name: ":iterable", kind: ParamKind.list),
                        ParamDef(name: ":section", kind: ParamKind.section)],
              kind: SymbolKind.injected, impl: emeraldFor)
+  root.symbols["markup"] =
+      Symbol(params: @[ParamDef(name: "command", kind: ParamKind.atom),
+                       ParamDef(name: "opening", kind: ParamKind.atom),
+                       ParamDef(name: "closing", kind: ParamKind.atom),
+                       ParamDef(name: "content", kind: ParamKind.varDef),
+                       ParamDef(name: "section", kind: ParamKind.section)],
+              kind: SymbolKind.injected, impl: emeraldMarkup)
   var iprt = Interpreter(indent: newSeq[int](),
-                         curWhitespace: WhitespaceKind.none)
+                         curWhitespace: WhitespaceKind.none,
+                         curMarkupSequence: "",
+                         expectedClosing: newSeq[string]())
   iprt.lex.open(input)
   iprt.curIndent = iprt.lex.findContentStart()
   if iprt.lex.buf[iprt.lex.bufpos] != EndOfFile:
