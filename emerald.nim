@@ -51,13 +51,23 @@ type
     param: string
     impl: Content
   
+  ItemizeProc = ref object
+    bullet: string
+    param: string
+    impl: Content
+
   Context = ref object
     symbols: Table[string, Symbol]
     whitespaceProcessing: bool
     emeraldChar: char
     parent: Context
     enclosed: seq[EnclosedProc]
-  
+    itemized: seq[ItemizeProc]
+
+  BulletItem = object
+    markup: string
+    indent: int
+
   Interpreter = ref object
     lex: BaseLexer
     indent: seq[int]
@@ -65,6 +75,7 @@ type
     curWhitespace: WhitespaceKind
     curMarkupSequence: string
     expectedClosing: seq[string]
+    curBulletItems: seq[BulletItem]
 
 const markupSymbols = {'!', '\"', '#', '$', '%', '&', '\'', '(', ')', '*', '+',
                        '-', ',', '.', '/', ':', ';', '<', '>', '=', '?', '@',
@@ -123,7 +134,8 @@ proc childContext(source: Context): Context =
   Context(symbols: initTable[string, Symbol](),
           whitespaceProcessing: source.whitespaceProcessing,
           emeraldChar: source.emeraldChar, parent: source,
-          enclosed: newSeq[EnclosedProc]())
+          enclosed: newSeq[EnclosedProc](),
+          itemized: newSeq[ItemizeProc]())
 
 proc indentation(lex: var BaseLexer): int =
   result = 0
@@ -265,9 +277,7 @@ proc executeCall(call: Content, context: Context): Content =
       curContext = curContext.parent
     
   # map parameters and setup context
-  var callContext = Context(symbols: initTable[string, Symbol](),
-      whitespaceProcessing: true, emeraldChar: context.emeraldChar,
-      parent: context, enclosed: newSeq[EnclosedProc]())
+  var callContext = childContext(context)
   
   if sym.params.len == 0:
     if call.params.len > 0:
@@ -303,7 +313,7 @@ proc executeCall(call: Content, context: Context): Content =
           if sym.params[i].kind == ParamKind.section and paramMapping[i] == -1:
             paramMapping[i] = -2
             break searchSectionParam
-        raise newException(Exception, "Cannot map section to a parameter") 
+        raise newException(Exception, "Cannot map section to a parameter")
     for i in 0 .. paramMapping.high:
       if paramMapping[i] == -1:
         case sym.params[i].kind
@@ -332,7 +342,7 @@ proc executeCall(call: Content, context: Context): Content =
           callContext.symbols[sym.params[i].name] = Symbol(
               kind: SymbolKind.emerald, params: newSeq[ParamDef](),
               content: collectedMap)
-          mapParams.setLen(0) 
+          mapParams.setLen(0)
         of ParamKind.atom, ParamKind.list, ParamKind.section:
           if sym.params[i].default == nil:
             raise newException(Exception,
@@ -379,7 +389,6 @@ proc executeCall(call: Content, context: Context): Content =
       raise newException(Exception, "Unknown parameter(s)!")
 
   # execute call
-  var contentToAdd: Content
   if sym.kind == SymbolKind.emerald:
     result = execute(sym.content, callContext)
   else:
@@ -417,11 +426,7 @@ proc processCall(iprt: var Interpreter, context: Context): Content =
       raise newException(Exception, "Missing section content")
     iprt.indent.add(iprt.curIndent)
     iprt.curWhitespace = WhitespaceKind.none
-    result.section = iprt.processSection(
-        Context(symbols: initTable[string, Symbol](),
-                whitespaceProcessing: true,
-                emeraldChar: context.emeraldChar, parent: context,
-                enclosed: newSeq[EnclosedProc]()))
+    result.section = iprt.processSection(childContext(context))
     discard iprt.indent.pop()
   else:
     iprt.skipUntilNextContent(false)
@@ -443,6 +448,9 @@ proc processText(iprt: var Interpreter, context: Context): Content =
           inc(iprt.lex.bufpos)
           if iprt.expectedClosing.len > 0 and iprt.curMarkupSequence ==
               iprt.expectedClosing[iprt.expectedClosing.high]:
+            return result
+        for itemized in context.itemized:
+          if iprt.curMarkupSequence == itemized.bullet:
             return result
         for enclosed in context.enclosed:
           if iprt.curMarkupSequence == enclosed.opening:
@@ -487,7 +495,9 @@ proc processText(iprt: var Interpreter, context: Context): Content =
 proc processSection(iprt: var Interpreter, context: Context): Content =
   result = newList()
   var current: Content
-  while iprt.curIndent >= iprt.indent[iprt.indent.high]:
+  while iprt.curIndent >= iprt.indent[iprt.indent.high] and
+      (iprt.curBulletItems.len == 0 or
+       iprt.curIndent >= iprt.curBulletItems[iprt.curBulletItems.high].indent):
     if iprt.curWhitespace == WhitespaceKind.major:
       if current != nil:
         result.items.add(current)
@@ -511,6 +521,17 @@ proc processSection(iprt: var Interpreter, context: Context): Content =
                 "Missing markup end: " & enclosed.closing)
           iprt.curMarkupSequence.setLen(0)
           discard iprt.expectedClosing.pop()
+      for itemized in context.itemized:
+        if itemized.bullet == iprt.curMarkupSequence:
+          inc(iprt.curIndent)
+          iprt.curBulletItems.add(BulletItem(markup: iprt.curMarkupSequence,
+                                             indent: iprt.curIndent))
+          iprt.curMarkupSequence.setLen(0)
+          var markupContext = childContext(context)
+          markupContext.symbols[itemized.param] =
+              newSymbol(iprt.processSection(context))
+          node = execute(itemized.impl, markupContext)
+          discard iprt.curBulletItems.pop()
     elif iprt.lex.buf[iprt.lex.bufpos] == context.emeraldChar:
       node = executeCall(iprt.processCall(context), context)
     else:
@@ -578,19 +599,22 @@ proc emeraldMarkup(context: Context): Content =
     command = context.symbols["command"].content
     content = context.symbols["content"].content
     section = context.symbols["section"].content
+    opening = context.symbols["opening"].content
   assert command.kind == ContentKind.text
   assert content.kind == ContentKind.call
   assert context.parent != nil
+  assert opening.kind == ContentKind.text
   case command.textContent
   of "enclosed":
     let
-      opening = context.symbols["opening"].content
       closing = context.symbols["closing"].content
-    assert opening.kind == ContentKind.text
     assert closing.kind == ContentKind.text
     context.parent.enclosed.add(EnclosedProc(
         opening: opening.textContent, closing: closing.textContent,
         param: content.name, impl: section))
+  of "itemized":
+    context.parent.itemized.add(ItemizeProc(
+        bullet: opening.textContent, param: content.name, impl: section))
   else:
     raise newException(Exception,
         "Unknown markup commando: " & command.textContent)
@@ -633,7 +657,8 @@ proc contentFromJson(node: JsonNode): Content =
 proc render*(input: Stream, output: Stream, params: JsonNode) =
   var root = Context(symbols: initTable[string, Symbol](),
                      whitespaceProcessing: true,
-                     emeraldChar: '\\', enclosed: newSeq[EnclosedProc]())
+                     emeraldChar: '\\', enclosed: newSeq[EnclosedProc](),
+                     itemized: newSeq[ItemizeProc]())
   assert params.kind == JObject
   for key, value in params.pairs():
     root.symbols[key] = newSymbol(contentFromJson(value))
@@ -651,14 +676,16 @@ proc render*(input: Stream, output: Stream, params: JsonNode) =
   root.symbols["markup"] =
       Symbol(params: @[ParamDef(name: "command", kind: ParamKind.atom),
                        ParamDef(name: "opening", kind: ParamKind.atom),
-                       ParamDef(name: "closing", kind: ParamKind.atom),
                        ParamDef(name: "content", kind: ParamKind.varDef),
+                       ParamDef(name: "closing", kind: ParamKind.atom,
+                                default: newText()),
                        ParamDef(name: "section", kind: ParamKind.section)],
               kind: SymbolKind.injected, impl: emeraldMarkup)
   var iprt = Interpreter(indent: newSeq[int](),
                          curWhitespace: WhitespaceKind.none,
                          curMarkupSequence: "",
-                         expectedClosing: newSeq[string]())
+                         expectedClosing: newSeq[string](),
+                         curBulletItems: newSeq[BulletItem]())
   iprt.lex.open(input)
   iprt.curIndent = iprt.lex.findContentStart()
   if iprt.lex.buf[iprt.lex.bufpos] != EndOfFile:
