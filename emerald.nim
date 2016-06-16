@@ -5,7 +5,7 @@ type
     none, minor, major
   
   ContentKind {.pure.} = enum
-    text, call, concat, list
+    boolean, text, call, concat, list
   
   Param = object
     name: string
@@ -13,6 +13,8 @@ type
   
   Content = ref object
     case kind: ContentKind
+    of ContentKind.boolean:
+      boolVal: bool
     of ContentKind.text:
       textContent: string
     of ContentKind.call:
@@ -95,6 +97,8 @@ proc toString(val: Param, indent: int): string =
 proc toString(val: Content, indent: int): string =
   result = repeat(' ', indent)
   case val.kind
+  of ContentKind.boolean:
+    result.add("bool: " & $val.boolVal & "\n")
   of ContentKind.text:
     result.add("text:\n" &
         repeat(' ', indent + 2) & '\"' & val.textContent & "\"\n")
@@ -263,7 +267,7 @@ proc skipUntilNextContent(iprt: var Interpreter, firstLinebreakIsMajor: bool) =
 proc execute(subject: Content, context: Context): Content =
   result = newList()
   case subject.kind
-  of ContentKind.text:
+  of ContentKind.text, ContentKind.boolean:
     result.items.add(subject)
   of ContentKind.call:
     result.addListItem(executeCall(subject, context))
@@ -652,6 +656,21 @@ proc emeraldMarkup(context: Context): Content =
     raise newException(Exception,
         "Unknown markup commando: " & command.textContent)
 
+proc emeraldIf(context: Context): Content =
+  let
+    condition = context.symbols["condition"].content
+    thenBranch = context.symbols["then"].content
+    elseBranch = context.symbols["else"].content
+  if condition.kind == ContentKind.call:
+    result = Content(kind: ContentKind.call, name: "if", params: @[
+        Param(name: "condition", value: condition),
+        Param(name: "then", value: thenBranch),
+        Param(name: "else", value: elseBranch)],
+        sections: newSeq[Content]())
+  else:
+    if condition.boolVal: result = thenBranch
+    else: result = elseBranch
+
 proc writeResultTree(output: Stream, tree: Content) =
   case tree.kind
   of ContentKind.call:
@@ -670,6 +689,8 @@ proc writeResultTree(output: Stream, tree: Content) =
       writeResultTree(output, item)
   of ContentKind.text:
     output.write(tree.textContent)
+  of ContentKind.boolean:
+    output.write($tree.boolVal)
 
 proc contentFromJson(node: JsonNode): Content =
   case node.kind
@@ -684,6 +705,8 @@ proc contentFromJson(node: JsonNode): Content =
     result = newList()
     for key, value in node.fields.pairs():
       result.addListItem(newList(@[newText(key), contentFromJson(value)]))
+  of JBool:
+    result = Content(kind: ContentKind.boolean, boolVal: node.bval)
   else:
     raise newException(Exception, "Unsupported JSON node kind: " & $node.kind)
 
@@ -716,6 +739,12 @@ proc render*(input: Stream, output: Stream, params: JsonNode) =
                        ParamDef(name: "section2", kind: ParamKind.section,
                                 default: newText())],
               kind: SymbolKind.injected, impl: emeraldMarkup)
+  root.symbols["if"] =
+      Symbol(params: @[ParamDef(name: "condition", kind: ParamKind.atom),
+                       ParamDef(name: "then", kind: ParamKind.section),
+                       ParamDef(name: "else", kind: ParamKind.section,
+                                default: newText())],
+             kind: SymbolKind.injected, impl: emeraldIf)
   var iprt = Interpreter(indent: newSeq[int](),
                          curWhitespace: WhitespaceKind.none,
                          curMarkupSequence: "",
