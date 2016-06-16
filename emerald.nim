@@ -119,14 +119,32 @@ proc `$`*(val: Content): string = val.toString(0)
 proc newText(content: string = ""): Content =
   Content(kind: ContentKind.text, textContent: content)
 
+proc addListItem(o: Content, item: Content) =
+  assert o.kind == ContentKind.list
+  if item.kind notin {ContentKind.list, ContentKind.concat} or
+      (item.kind == ContentKind.list and item.items.len > 0) or
+      (item.kind == ContentKind.concat and item.values.len > 0):
+    o.items.add(item)
+
+proc addConcatItem(o: Content, whitespace: bool, item: Content) =
+  assert o.kind == ContentKind.concat
+  if item.kind notin {ContentKind.list, ContentKind.concat} or
+      (item.kind == ContentKind.list and item.items.len > 0) or
+      (item.kind == ContentKind.concat and item.values.len > 0):
+    o.values.add((whitespace: whitespace, node: item))
+  else:
+    echo "discarding ", item.kind
+
 proc newList(items: seq[Content] = newSeq[Content]()): Content =
-  Content(kind: ContentKind.list, items: items)
+  result = Content(kind: ContentKind.list, items: newSeq[Content]())
+  for item in items:
+    result.addListItem(item)
 
 proc newConcat(first: Content = nil): Content =
   result = Content(kind: ContentKind.concat,
                    values: newSeq[tuple[whitespace: bool, node: Content]]())
   if first != nil:
-    result.values.add((whitespace: false, node: first))
+    result.addConcatItem(false, first)
 
 proc newSymbol(content: Content): Symbol =
   Symbol(params: newSeq[ParamDef](), kind: SymbolKind.emerald, content: content)
@@ -248,19 +266,17 @@ proc execute(subject: Content, context: Context): Content =
   of ContentKind.text:
     result.items.add(subject)
   of ContentKind.call:
-    result.items.add(executeCall(subject, context))
+    result.addListItem(executeCall(subject, context))
   of ContentKind.concat:
     var target = newConcat()
     for value in subject.values:
-      target.values.add(
-          (whitespace: value.whitespace,
-           node: execute(value.node, context)))
-    result.items.add(target)
+      target.addConcatItem(value.whitespace, execute(value.node, context))
+    result.addListItem(target)
   of ContentKind.list:
     var target = newList()
     for item in subject.items:
-      target.items.add(execute(item, context))
-    result.items.add(target)
+      target.addListItem(execute(item, context))
+    result.addListItem(target)
   if result.items.len == 1:
     result = result.items[0]
 
@@ -323,12 +339,10 @@ proc executeCall(call: Content, context: Context): Content =
           for j in listParams:
             let value = call.params[j].value
             if value.kind == ContentKind.call:
-              collectedList.items.add(executeCall(value, context))
+              collectedList.addListItem(executeCall(value, context))
             else:
-              collectedList.items.add(value)
-          callContext.symbols[sym.params[i].name] = Symbol(
-              kind: SymbolKind.emerald, params: newSeq[ParamDef](),
-              content: collectedList)
+              collectedList.addListItem(value)
+          callContext.symbols[sym.params[i].name] = newSymbol(collectedList)
           listParams.setLen(0)
         of ParamKind.mapCollector:
           var collectedMap = newList()
@@ -502,7 +516,7 @@ proc processSection(iprt: var Interpreter, context: Context): Content =
        iprt.curIndent >= iprt.curBulletItems[iprt.curBulletItems.high].indent):
     if iprt.curWhitespace == WhitespaceKind.major:
       if current != nil:
-        result.items.add(current)
+        result.addListItem(current)
         current = nil
     let whitespace = iprt.curWhitespace == WhitespaceKind.minor
     var node: Content
@@ -534,7 +548,7 @@ proc processSection(iprt: var Interpreter, context: Context): Content =
           markupContext.symbols[itemized.param] =
               newSymbol(iprt.processSection(context))
           var inner = newList()
-          inner.items.add(execute(itemized.itemImpl, markupContext))
+          inner.addListItem(execute(itemized.itemImpl, markupContext))
           while iprt.curIndent == item.indent - item.markup.len:
             if iprt.curMarkupSequence.len == 0: break
             if iprt.curMarkupSequence  != item.markup: break
@@ -542,7 +556,7 @@ proc processSection(iprt: var Interpreter, context: Context): Content =
             iprt.curIndent = item.indent
             markupContext.symbols[itemized.param] =
                 newSymbol(iprt.processSection(context))
-            inner.items.add(execute(itemized.itemImpl, markupContext))
+            inner.addListItem(execute(itemized.itemImpl, markupContext))
           markupContext.symbols[itemized.param] = newSymbol(inner)
           node = execute(itemized.enclosingImpl, markupContext)
           discard iprt.curBulletItems.pop()
@@ -552,13 +566,15 @@ proc processSection(iprt: var Interpreter, context: Context): Content =
     else:
       node = iprt.processText(context)
     if current == nil: current = node
-    else:
+    elif node.kind notin {ContentKind.concat, ContentKind.list} or
+        (node.kind == ContentKind.concat and node.values.len > 0) or
+        (node.kind == ContentKind.list and node.items.len > 0):
       if current.kind != ContentKind.concat:
         current = newConcat(current)
       current.values.add((whitespace: whitespace, node: node))
     if iprt.lex.buf[iprt.lex.bufpos] == EndOfFile: break
   if current != nil:
-    result.items.add(current)
+    result.addListItem(current)
 
 proc emeraldDefine(context: Context): Content =
   result = newList()
@@ -608,7 +624,7 @@ proc emeraldFor(context: Context): Content =
     result = newList()
     for item in iterable.items:
       context.symbols[variable.name] = newSymbol(item)
-      result.items.add(execute(content, context))
+      result.addListItem(execute(content, context))
 
 proc emeraldMarkup(context: Context): Content =
   let
@@ -663,11 +679,11 @@ proc contentFromJson(node: JsonNode): Content =
   of JArray:
     result = newList()
     for elem in node.elems:
-      result.items.add(contentFromJson(elem))
+      result.addListItem(contentFromJson(elem))
   of JObject:
     result = newList()
     for key, value in node.fields.pairs():
-      result.items.add(newList(@[newText(key), contentFromJson(value)]))
+      result.addListItem(newList(@[newText(key), contentFromJson(value)]))
   else:
     raise newException(Exception, "Unsupported JSON node kind: " & $node.kind)
 
