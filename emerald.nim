@@ -207,6 +207,7 @@ proc processCallParams(iprt: var Interpreter, params: var seq[Param],
         if itemName.len == 0:
           raise newException(Exception, "Missing parameter name in front of '='")
         paramName = itemName
+        itemName = nil
         inc(iprt.lex.bufpos)
         iprt.lex.skipWhitespace()
         if iprt.lex.buf[iprt.lex.bufpos] != context.emeraldChar:
