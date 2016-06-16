@@ -18,7 +18,7 @@ type
     of ContentKind.call:
       name: string
       params: seq[Param]
-      section: Content
+      sections: seq[Content]
     of ContentKind.concat:
       values: seq[tuple[whitespace: bool, node: Content]]
     of ContentKind.list:
@@ -101,9 +101,9 @@ proc toString(val: Content, indent: int): string =
     result.add("call(" & val.name & "):\n")
     for param in val.params:
       result.add(toString(param, indent + 2))
-    if not isNil(val.section):
+    for section in val.sections:
       result.add(repeat(' ', indent + 2) & "section:\n")
-      result.add(toString(val.section, indent + 4))
+      result.add(toString(section, indent + 4))
   of ContentKind.concat:
     result.add("concat:\n")
     for value in val.values:
@@ -200,7 +200,7 @@ proc processCallParams(iprt: var Interpreter, params: var seq[Param]) =
         raise newException(Exception, "Missing call name")
       var param = Param(name: paramName, value:
           Content(kind: ContentKind.call, name: itemName,
-                      params: newSeq[Param]()))
+                  params: newSeq[Param](), sections: newSeq[Content]()))
       iprt.processCallParams(param.value.params)
       params.add(param)
       inc(iprt.lex.bufpos)
@@ -214,7 +214,7 @@ proc processCallParams(iprt: var Interpreter, params: var seq[Param]) =
     else:
       params.add(Param(name: paramName, value:
           Content(kind: ContentKind.call, name: itemName,
-                      params: newSeq[Param]())))
+                  params: newSeq[Param](), sections: newSeq[Content]())))
     if iprt.lex.buf[iprt.lex.bufpos] notin {',', ')'}:
       raise newException(Exception,
           "Invalid content: '" & iprt.lex.buf[iprt.lex.bufpos] & "'")
@@ -307,11 +307,11 @@ proc executeCall(call: Content, context: Context): Content =
             sym.params[paramIndex].kind in
                 {ParamKind.listCollector, ParamKind.mapCollector}):
           inc(paramIndex)
-    if call.section != nil:
+    for i in 0 .. call.sections.high:
       block searchSectionParam:
-        for i in 0 .. sym.params.high:
-          if sym.params[i].kind == ParamKind.section and paramMapping[i] == -1:
-            paramMapping[i] = -2
+        for j in 0 .. sym.params.high:
+          if sym.params[j].kind == ParamKind.section and paramMapping[j] == -1:
+            paramMapping[j] = -2 - i
             break searchSectionParam
         raise newException(Exception, "Cannot map section to a parameter")
     for i in 0 .. paramMapping.high:
@@ -355,10 +355,10 @@ proc executeCall(call: Content, context: Context): Content =
         of ParamKind.varDef:
           raise newException(Exception,
               "Missing required parameter: " & sym.params[i].name)
-      elif paramMapping[i] == -2:
+      elif paramMapping[i] <= -2:
         callContext.symbols[sym.params[i].name] =
             Symbol(kind: SymbolKind.emerald, params: newSeq[ParamDef](),
-                   content: call.section)
+                   content: call.sections[paramMapping[i] * -1 - 2])
       else:
         var node: Content
         let param = call.params[paramMapping[i]].value
@@ -378,7 +378,7 @@ proc executeCall(call: Content, context: Context): Content =
         of ParamKind.varDef:
           if param.kind != ContentKind.call:
             raise newException(Exception, "Expected a call")
-          elif param.params.len != 0 or param.section != nil:
+          elif param.params.len + param.sections.len != 0:
             raise newException(Exception, "Expected a call without params")
           node = param
         else: assert false
@@ -398,7 +398,7 @@ proc executeCall(call: Content, context: Context): Content =
 proc processCall(iprt: var Interpreter, context: Context): Content =
   assert iprt.lex.buf[iprt.lex.bufpos] == context.emeraldChar
   result = Content(kind: ContentKind.call, name: "",
-                   params: newSeq[Param]())
+                   params: newSeq[Param](), sections: newSeq[Content]())
   iprt.curWhitespace = WhitespaceKind.none
   inc(iprt.lex.bufpos)
   while iprt.lex.buf[iprt.lex.bufpos] in {'A'..'Z', 'a'..'z'}:
@@ -416,7 +416,9 @@ proc processCall(iprt: var Interpreter, context: Context): Content =
     while iprt.lex.buf[iprt.lex.bufpos] in {' ', '\t'}:
       iprt.curWhitespace = WhitespaceKind.minor
       inc(iprt.lex.bufpos)
-  if iprt.lex.buf[iprt.lex.bufpos] == ':':
+  if iprt.lex.buf[iprt.lex.bufpos] != ':':
+    iprt.skipUntilNextContent(false)
+  while iprt.lex.buf[iprt.lex.bufpos] == ':':
     iprt.curWhitespace = WhitespaceKind.none
     inc(iprt.lex.bufpos)
     iprt.skipUntilNextContent(true)
@@ -426,13 +428,11 @@ proc processCall(iprt: var Interpreter, context: Context): Content =
       raise newException(Exception, "Missing section content")
     iprt.indent.add(iprt.curIndent)
     iprt.curWhitespace = WhitespaceKind.none
-    result.section = iprt.processSection(childContext(context))
+    result.sections.add(iprt.processSection(childContext(context)))
     discard iprt.indent.pop()
-  else:
-    iprt.skipUntilNextContent(false)
     
 proc processText(iprt: var Interpreter, context: Context): Content =
-  result = Content(kind: ContentKind.text, textContent: "")
+  result = newText("")
   iprt.curWhitespace = WhitespaceKind.none
   while true:
     while iprt.lex.buf[iprt.lex.bufpos] notin
@@ -587,7 +587,8 @@ proc emeraldFor(context: Context): Content =
     result = Content(kind: ContentKind.call, name: "for", params: @[
         Param(name: ":var", value: variable),
         Param(name: ":iterable", value: iterable),
-        Param(name: ":section", value: content)])
+        Param(name: ":section", value: content)],
+        sections: newSeq[Content]())
   else:
     result = newList()
     for item in iterable.items:
