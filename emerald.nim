@@ -54,7 +54,8 @@ type
   ItemizeProc = ref object
     bullet: string
     param: string
-    impl: Content
+    itemImpl: Content
+    enclosingImpl: Content
 
   Context = ref object
     symbols: Table[string, Symbol]
@@ -172,49 +173,50 @@ proc processString(lex: var BaseLexer): Content =
 
 proc processSection(iprt: var Interpreter, context: Context): Content
 
-proc processCallParams(iprt: var Interpreter, params: var seq[Param]) =
+proc executeCall(call: Content, context: Context): Content
+
+proc processCall(iprt: var Interpreter, context: Context): Content
+
+proc callItem(lex: var BaseLexer): string =
+  result = ""
+  while true:
+    while lex.buf[lex.bufpos] notin
+        {',', '=', ')', ' ', '\t', '\l', '\c', EndOfFile}:
+      result.add(lex.buf[lex.bufpos])
+      inc(lex.bufpos)
+    var whitespace = false
+    while lex.buf[lex.bufpos] in {' ', '\t'}:
+      whitespace = true
+      inc(lex.bufpos)
+    if lex.buf[lex.bufpos] in {'\l', '\c', '=', ',', ')', EndOfFile}:
+      break
+    if whitespace: result.add(' ')
+
+proc processCallParams(iprt: var Interpreter, params: var seq[Param],
+                       context: Context) =
   assert iprt.lex.buf[iprt.lex.bufpos] == '('
   inc(iprt.lex.bufpos)
   iprt.lex.skipWhitespace()
   if iprt.lex.buf[iprt.lex.bufpos] == ')': return
   while true:
-    var itemName = ""
-    while iprt.lex.buf[iprt.lex.bufpos] in {'A'..'Z', 'a'..'z'}:
-      itemName.add(iprt.lex.buf[iprt.lex.bufpos])
-      inc(iprt.lex.bufpos)
-    iprt.lex.skipWhitespace()
     var paramName: string = nil
-    if iprt.lex.buf[iprt.lex.bufpos] == '=':
-      if itemName.len == 0:
-        raise newException(Exception, "Missing parameter name in front of '='")
-      paramName = itemName
-      inc(iprt.lex.bufpos)
-      itemName = ""
-      while iprt.lex.buf[iprt.lex.bufpos] in {'A'..'Z', 'a'..'z'}:
-        itemName.add(iprt.lex.buf[iprt.lex.bufpos])
+    var itemName: string = nil
+    if iprt.lex.buf[iprt.lex.bufpos] != context.emeraldChar:
+      itemName = iprt.lex.callItem()
+      if iprt.lex.buf[iprt.lex.bufpos] == '=':
+        if itemName.len == 0:
+          raise newException(Exception, "Missing parameter name in front of '='")
+        paramName = itemName
         inc(iprt.lex.bufpos)
-      iprt.lex.skipWhitespace()
-    case iprt.lex.buf[iprt.lex.bufpos]
-    of '(':
-      if itemName.len == 0:
-        raise newException(Exception, "Missing call name")
-      var param = Param(name: paramName, value:
-          Content(kind: ContentKind.call, name: itemName,
-                  params: newSeq[Param](), sections: newSeq[Content]()))
-      iprt.processCallParams(param.value.params)
-      params.add(param)
-      inc(iprt.lex.bufpos)
-      iprt.lex.skipWhitespace()
-    of '\"':
-      if itemName.len != 0:
-        raise newException(Exception, "Invalid content")
-      params.add(Param(name: paramName, value: iprt.lex.processString()))
-      inc(iprt.lex.bufpos)
-      iprt.lex.skipWhitespace()
+        iprt.lex.skipWhitespace()
+        if iprt.lex.buf[iprt.lex.bufpos] != context.emeraldChar:
+          itemName = iprt.lex.callItem()
+    if isNil(itemName):
+      params.add(Param(name: paramName, value:
+          executeCall(iprt.processCall(context), context)))
     else:
       params.add(Param(name: paramName, value:
-          Content(kind: ContentKind.call, name: itemName,
-                  params: newSeq[Param](), sections: newSeq[Content]())))
+          Content(kind: ContentKind.text, textContent: itemName)))
     if iprt.lex.buf[iprt.lex.bufpos] notin {',', ')'}:
       raise newException(Exception,
           "Invalid content: '" & iprt.lex.buf[iprt.lex.bufpos] & "'")
@@ -238,8 +240,6 @@ proc skipUntilNextContent(iprt: var Interpreter, firstLinebreakIsMajor: bool) =
     else:
       iprt.curWhitespace = WhitespaceKind.major
     iprt.curIndent = iprt.lex.indentation()
-
-proc executeCall(call: Content, context: Context): Content
 
 proc execute(subject: Content, context: Context): Content =
   result = newList()
@@ -377,7 +377,8 @@ proc executeCall(call: Content, context: Context): Content =
             raise newException(Exception, "Expected list as param value")
         of ParamKind.varDef:
           if param.kind != ContentKind.call:
-            raise newException(Exception, "Expected a call")
+            raise newException(Exception, "Expected a call for " & 
+                sym.params[i].name)
           elif param.params.len + param.sections.len != 0:
             raise newException(Exception, "Expected a call without params")
           node = param
@@ -411,7 +412,7 @@ proc processCall(iprt: var Interpreter, context: Context): Content =
     inc(iprt.lex.bufpos)
   if iprt.lex.buf[iprt.lex.bufpos] == '(':
     iprt.curWhitespace = WhitespaceKind.none
-    iprt.processCallParams(result.params)
+    iprt.processCallParams(result.params, context)
     inc(iprt.lex.bufpos)
     while iprt.lex.buf[iprt.lex.bufpos] in {' ', '\t'}:
       iprt.curWhitespace = WhitespaceKind.minor
@@ -524,14 +525,27 @@ proc processSection(iprt: var Interpreter, context: Context): Content =
       for itemized in context.itemized:
         if itemized.bullet == iprt.curMarkupSequence:
           inc(iprt.curIndent)
-          iprt.curBulletItems.add(BulletItem(markup: iprt.curMarkupSequence,
-                                             indent: iprt.curIndent))
+          let item = BulletItem(markup: iprt.curMarkupSequence,
+                                indent: iprt.curIndent)
+          iprt.curBulletItems.add(item)
           iprt.curMarkupSequence.setLen(0)
           var markupContext = childContext(context)
           markupContext.symbols[itemized.param] =
               newSymbol(iprt.processSection(context))
-          node = execute(itemized.impl, markupContext)
+          var inner = newList()
+          inner.items.add(execute(itemized.itemImpl, markupContext))
+          while iprt.curIndent == item.indent - item.markup.len:
+            if iprt.curMarkupSequence.len == 0: break
+            if iprt.curMarkupSequence  != item.markup: break
+            iprt.curMarkupSequence.setLen(0)
+            iprt.curIndent = item.indent
+            markupContext.symbols[itemized.param] =
+                newSymbol(iprt.processSection(context))
+            inner.items.add(execute(itemized.itemImpl, markupContext))
+          markupContext.symbols[itemized.param] = newSymbol(inner)
+          node = execute(itemized.enclosingImpl, markupContext)
           discard iprt.curBulletItems.pop()
+          break
     elif iprt.lex.buf[iprt.lex.bufpos] == context.emeraldChar:
       node = executeCall(iprt.processCall(context), context)
     else:
@@ -607,15 +621,16 @@ proc emeraldMarkup(context: Context): Content =
   assert opening.kind == ContentKind.text
   case command.textContent
   of "enclosed":
-    let
-      closing = context.symbols["closing"].content
+    let closing = context.symbols["closing"].content
     assert closing.kind == ContentKind.text
     context.parent.enclosed.add(EnclosedProc(
         opening: opening.textContent, closing: closing.textContent,
         param: content.name, impl: section))
   of "itemized":
+    let section2 = context.symbols["section2"].content
     context.parent.itemized.add(ItemizeProc(
-        bullet: opening.textContent, param: content.name, impl: section))
+        bullet: opening.textContent, param: content.name, itemImpl: section,
+        enclosingImpl: section2))
   else:
     raise newException(Exception,
         "Unknown markup commando: " & command.textContent)
@@ -634,7 +649,7 @@ proc writeResultTree(output: Stream, tree: Content) =
     var first = true
     for item in tree.items:
       if first: first = false
-      else: output.write("\n\n")
+      else: output.write("\n")
       writeResultTree(output, item)
   of ContentKind.text:
     output.write(tree.textContent)
@@ -680,7 +695,9 @@ proc render*(input: Stream, output: Stream, params: JsonNode) =
                        ParamDef(name: "content", kind: ParamKind.varDef),
                        ParamDef(name: "closing", kind: ParamKind.atom,
                                 default: newText()),
-                       ParamDef(name: "section", kind: ParamKind.section)],
+                       ParamDef(name: "section", kind: ParamKind.section),
+                       ParamDef(name: "section2", kind: ParamKind.section,
+                                default: newText())],
               kind: SymbolKind.injected, impl: emeraldMarkup)
   var iprt = Interpreter(indent: newSeq[int](),
                          curWhitespace: WhitespaceKind.none,
