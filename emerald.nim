@@ -59,6 +59,10 @@ type
     itemImpl: Content
     enclosingImpl: Content
 
+  Filter = ref object
+    param: string
+    impl: Content
+  
   Context = ref object
     symbols: Table[string, Symbol]
     whitespaceProcessing: bool
@@ -66,6 +70,7 @@ type
     parent: Context
     enclosed: seq[EnclosedProc]
     itemized: seq[ItemizeProc]
+    filter: Filter
 
   BulletItem = object
     markup: string
@@ -511,6 +516,10 @@ proc processText(iprt: var Interpreter, context: Context): Content =
         iprt.curIndent < iprt.indent[iprt.indent.high] or
         iprt.curWhitespace == WhitespaceKind.major: break
     result.textContent.add(' ')
+  if context.filter != nil:
+    var filterContext = childContext(context)
+    filterContext.symbols[context.filter.param] = newSymbol(result)
+    result = execute(context.filter.impl, filterContext)
 
 proc processSection(iprt: var Interpreter, context: Context): Content =
   result = newList()
@@ -671,6 +680,32 @@ proc emeraldIf(context: Context): Content =
     if condition.boolVal: result = thenBranch
     else: result = elseBranch
 
+proc emeraldEscapeHtml(context: Context): Content =
+  let text = context.symbols["text"].content
+  echo $text
+  if text.kind == ContentKind.call:
+    result = Content(kind: ContentKind.call, name: "escapeHtml", params: @[
+        Param(name: "text", value: text)],
+        sections: newSeq[Content]())
+  else:
+    assert text.kind == ContentKind.text
+    result = newText("")
+    for c in text.textContent:
+      case c
+      of '<': result.textContent.add("&lt;")
+      of '>': result.textContent.add("&gt;")
+      of '&': result.textContent.add("&amp;")
+      else: result.textContent.add(c)
+
+proc emeraldFilter(context: Context): Content =
+  let
+    content = context.symbols["content"].content
+    section = context.symbols["section"].content
+  assert content.kind == ContentKind.call
+  assert context.parent != nil
+  context.parent.filter = Filter(param: content.name, impl: section)
+  result = newList()
+
 proc writeResultTree(output: Stream, tree: Content) =
   case tree.kind
   of ContentKind.call:
@@ -745,6 +780,13 @@ proc render*(input: Stream, output: Stream, params: JsonNode) =
                        ParamDef(name: "else", kind: ParamKind.section,
                                 default: newText())],
              kind: SymbolKind.injected, impl: emeraldIf)
+  root.symbols["escapeHtml"] =
+      Symbol(params: @[ParamDef(name: "text", kind: ParamKind.atom)],
+             kind: SymbolKind.injected, impl: emeraldEscapeHtml)
+  root.symbols["filter"] =
+      Symbol(params: @[ParamDef(name: "content", kind: ParamKind.varDef),
+                       ParamDef(name: "section", kind: ParamKind.section)],
+             kind: SymbolKind.injected, impl: emeraldFilter)
   var iprt = Interpreter(indent: newSeq[int](),
                          curWhitespace: WhitespaceKind.none,
                          curMarkupSequence: "",
