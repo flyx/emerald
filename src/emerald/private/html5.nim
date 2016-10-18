@@ -286,7 +286,7 @@ tag_list:
     script:
         content_categories = (metadata_content, flow_content, phrasing_content)
         permitted_content  = text_content
-        optional_attrs     = (async, src, `type`, `defer`)
+        optional_attrs     = (async, src, `type`, `defer`, charset)
     select:
         content_categories = (flow_content, phrasing_content,
                               interactive_content)
@@ -305,7 +305,7 @@ tag_list:
         permitted_content = phrasing_content
     table:
         content_categories = flow_content
-        permitted_tags     = (caption, colgroup, thread, tbody, tfoot, tr)
+        permitted_tags     = (caption, colgroup, thead, tbody, tfoot, tr)
     (tbody, tfoot, thead):
         permitted_tags = tr
     (td, th):
