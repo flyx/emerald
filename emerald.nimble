@@ -1,6 +1,6 @@
 [Package]
 name          = "emerald"
-version       = "0.2.1"
+version       = "0.2.2"
 author        = "Felix Krause"
 description   = "macro-based HTML templating engine"
 license       = "WTFPL"
