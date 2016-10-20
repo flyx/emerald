@@ -1,6 +1,12 @@
 Changelog
 =========
 
+v0.2.2
+------
+
+- Fixed ``thead`` in allowed tags for ``table`` tag
+- Added missing ``charset`` parameter to ``script`` tag
+
 v0.2.1
 ------
 
