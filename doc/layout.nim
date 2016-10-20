@@ -10,7 +10,6 @@ var sites*: seq[site] = newSeq[site]()
 
 proc layout*(title: string,
              sites: seq[site]) {. html_templ .} =
-    {. compact_mode = true .}
     html(lang="en"):
         head:
             title:
@@ -22,7 +21,7 @@ proc layout*(title: string,
             header:
                 h1: "emerald"
                 h2:
-                    "a HTML templating engine for "
+                    "an HTML templating engine for "
                     a(href="http://nim-lang.org/", "Nim")
             main:
                 nav:
