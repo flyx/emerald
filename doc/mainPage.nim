@@ -10,7 +10,7 @@ proc home*() {. html_templ: layout .} =
             p:
                 strong("emerald"); " is a Nim library for writing "
                 a(href="http://www.w3.org/TR/html5/", "HTML 5")
-                """ templates. It is implemented as domain-specific language
+                """ templates. It is implemented as a domain-specific language
                 that can be used directly in your Nim source code via macros.
                 Features include:"""
             ul:
