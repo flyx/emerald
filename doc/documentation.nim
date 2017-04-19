@@ -355,7 +355,7 @@ proc templ() {.html_templ.} =
     
     ul:
         # use a for loop
-        for i in 0 .. val:
+        for i in 0 .. max:
             li:
                 # use if
                 if i == current:
