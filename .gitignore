@@ -1,6 +1,7 @@
-nimcache
-nakefile
+*
+!/**/
+!*.*
+tests/.nimcache
 doc/generate
 doc/site
 compile_*.sh
-test/tests

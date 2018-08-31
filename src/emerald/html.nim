@@ -458,12 +458,12 @@ proc parse_tag(writer: StmtListWriter, context: ParseContext,
         of nnkStrLit:
             writer.add_attr_val(injectedAttr.name, injectedAttr.val.strVal)
         of nnkIdent:
-            let identName = $injectedAttr.val.ident
+            let identName = strVal(injectedAttr.val)
             if mappedInjectedAttrs.hasKey(identName):
                 mappedInjectedAttrs[identName] =
                     mappedInjectedAttrs[identName] & injectedAttr.name
             else:
-                mappedInjectedAttrs[$injectedAttr.val.ident] = @[injectedAttr.name]
+                mappedInjectedAttrs[strVal(injectedAttr.val)] = @[injectedAttr.name]
         else:
             quit "Error in tagdef!"
     
