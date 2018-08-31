@@ -1,3 +1,4 @@
+{.experimental: "notnil".}
 import
     sets, macros, hashes, strutils
 
@@ -70,7 +71,7 @@ proc id(tags: var seq[tuple[name: string, def: bool]], name: string,
             quit "Multiple definitions of tag \"" & name & "\"!"
         tags[result - 1].def = true
 
-macro tag_list*(content: stmt): stmt {.immediate.} =
+macro tag_list*(content: untyped): untyped =
     ## define a set of tags with this macro. Structure is:
     ##
     ## tagName:
@@ -158,7 +159,7 @@ macro tag_list*(content: stmt): stmt {.immediate.} =
         else:
             quit("Invalid child: " & $child[0].kind)
         
-        if child[0].kind == nnkIdent and $child[0].ident == "global":
+        if child[0].kind == nnkIdent and strVal(child[0]) == "global":
             # process global tags, i.e. build is_global_attr and is_bool_attr
             
             for targetChild in child[1].children:

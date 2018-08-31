@@ -1,6 +1,6 @@
-import streams, strtabs, osproc
-import packages.docutils.rstgen
-import packages.docutils.rst
+import 
+    streams, strtabs, osproc,
+    packages / docutils / [rst, rstgen]
 
 proc escape_html*(target: Stream, value: string,
                   escapeQuotes: bool = false) =

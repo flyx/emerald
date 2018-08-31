@@ -1,3 +1,4 @@
+{.experimental: "notnil".}
 import sets, tagdef, tables, strutils, macros
 import writer
 
