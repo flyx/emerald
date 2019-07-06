@@ -1,3 +1,4 @@
+{.experimental: "notnil".}
 import macros, streams
 
 type

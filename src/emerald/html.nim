@@ -20,7 +20,8 @@ template quit_unknown[T](node: NimNode, what: string, val: T) =
     quit "[emerald] " & node.lineInfo & ": Unknown " & what & ": \"" & $val & "\""
 
 template quit_unexpected[T](node: NimNode, what: string, val: T) =
-    quit "[emerald] " & node.lineInfo & ": Unexpected " & what & ": \"" & $val & "\""
+  quit """[emerald] $1: Unexpected $2: "$3"""" % [node.lineInfo, what, $val]
+  # quit "[emerald] " & node.lineInfo & ": Unexpected " & what & ": \"" & $val & "\""
 
 template quit_duplicate[T](node: NimNode, what: string, val: T) =
     quit "[emerald] " & node.lineInfo & ": Duplicate " & what & ": \"" & $val & "\""
@@ -40,10 +41,10 @@ proc ident_name(node: NimNode): string {.compileTime, inline.} =
     ## You can either escape it with ``, or simply use "d" as a substitute.
     if not (node.kind in [nnkAccQuoted, nnkPostfix, nnkIdent]):
         quit_invalid(node, "token (expected ident, accent-quoted, or postfix)",
-                $node.kind)
+                strVal(node))
     
-    let name: string = if node.kind == nnkAccQuoted: $node[0]
-            elif node.kind == nnkPostfix: $node[1] else: $node
+    let name: string = if node.kind == nnkAccQuoted: strVal(node[0])
+            elif node.kind == nnkPostfix: strVal(node[1]) else: strVal(node)
     result = if name == "d": "div" else: name
 
 # mixins are compiled each time they're used. This variable stores the
@@ -85,15 +86,15 @@ proc write_proc_content(streamName: NimNode, content: NimNode,
     return writer.result
 
 proc bool_from_ident(node: NimNode): bool {.compileTime.} =
-    case $node.ident
+    case strVal(node)
     of "true": result = true
     of "false": result = false
     else:
-        quit_invalid(node, "bool value", $node.ident)
+        quit_invalid(node, "bool value", strVal(node))
 
 proc int_from_lit(node: NimNode): int {.compileTime.} =
     if node.kind != nnkIntLit:
-        quit_unexpected(node, "node kind (expected int literal)", $node.kind)
+        quit_unexpected(node, "node kind (expected int literal)", strVal(node))
     result = int(node.intVal)
 
 proc add_filters(target: var seq[NimNode], node: NimNode,
@@ -102,16 +103,16 @@ proc add_filters(target: var seq[NimNode], node: NimNode,
     of nnkInfix:
         if node[0].kind != nnkIdent:
             quit_unexpected(node[0], "token", node[0].kind)
-        elif $node[0].ident != "&":
-            quit_unexpected(node[0], "operator", node[0].ident)
+        elif strVal(node[0]) != "&":
+            quit_unexpected(node[0], "operator", strVal(node[0]))
         add_filters(target, node[1], context)
         add_filters(target, node[2], context)
     of nnkIdent:
-        case $node.ident
+        case strVal(node)
         of "filters":
             target.add(context.filters)
         else:
-            quit_unexpected(node, "identifier", $node.ident)
+            quit_unexpected(node, "identifier", strVal(node))
     of nnkCall:
         target.add(node)
     of nnkNilLit:
@@ -123,7 +124,7 @@ proc process_pragma(writer: OptionalStmtListWriter, node: NimNode,
                     context: ParseContext) {.compileTime.} =
     case node.kind
     of nnkExprEqExpr:
-        case $node[0].ident
+        case strVal(node[0])
         of "compact_mode":
             context.compact = bool_from_ident(node[1])
         of "indent_step":
@@ -165,7 +166,7 @@ proc process_pragma(writer: OptionalStmtListWriter, node: NimNode,
                         "not allowed on root level of inheriting template")
         else:
             quit_unknown(node[0], "configuration value name",
-                    $node[0].ident)
+                    strVal(node[0]))
     else:
         quit_invalid(node, "pragma content", $node.kind)
 
@@ -182,7 +183,7 @@ proc copy_tree_replace_params(context: ParseContext, node: NimNode,
             var class = context.cur_class
             while class != nil:
                 for param in class.params.children:
-                    if $param[0].ident == $node.ident:
+                    if strVal(param[0]) == strVal(node):
                         isTemplParam = true
                         break searchForParam
                 class = class.parent
@@ -210,7 +211,7 @@ proc process_block_replacements(content: NimNode,
                 foundVar = false
             while curClass != nil:
                 for identDef in curClass.params.children:
-                    if $node[0].ident == identDef[0].ident_name:
+                    if strVal(node[0]) == identDef[0].ident_name:
                         foundVar = true
                         break
                 curClass = curClass.parent
@@ -296,14 +297,13 @@ proc process_block_replacements(content: NimNode,
                     update_template_class(class)
                     context.global_stmt_list.add(meth)
             else:
-                quit_unexpected(node,
-                        "command (expected replace, prepend or append)",
-                        node[0].ident_name)
+              block:
+                quit_unexpected(node, "command (expected replace, prepend or append)", node[0].ident_name)
         else:
             quit_unexpected(node, "token (expected block replacement command)",
                     node.kind)
 
-macro html_mixin*(content: expr): stmt =
+macro html_mixin*(content: untyped): untyped =
     if content.kind != nnkProcDef:
         quit_invalid(content, "html_mixin subject", "expected a proc def.")
     let fp = content[3]
@@ -314,7 +314,7 @@ macro html_mixin*(content: expr): stmt =
     mixins.add(content)
     result = newEmptyNode()
 
-macro html_templ*(arg1: expr, arg2: expr = nil): stmt =
+macro html_templ*(arg1: untyped, arg2: untyped = nil): untyped =
     let
         parent = if arg2.kind != nnkNilLit: arg1 else: nil
         content = if arg2.kind == nnkNilLit: arg1 else: arg2
@@ -397,8 +397,8 @@ macro html_templ*(arg1: expr, arg2: expr = nil): stmt =
     # add new… proc
     result.add(newProc(if content[0].kind == nnkPostfix:
             newNimNode(nnkPostfix).add(ident("*"),
-            ident("new" & capitalize(content[0].ident_name))) else:
-            ident("new" & capitalize(content[0].ident_name)),
+            ident("new" & toUpperAscii(content[0].ident_name))) else:
+            ident("new" & toUpperAscii(content[0].ident_name)),
             [className],
             newStmtList(newCall("new", ident("result")))))
     
@@ -458,12 +458,12 @@ proc parse_tag(writer: StmtListWriter, context: ParseContext,
         of nnkStrLit:
             writer.add_attr_val(injectedAttr.name, injectedAttr.val.strVal)
         of nnkIdent:
-            let identName = $injectedAttr.val.ident
+            let identName = strVal(injectedAttr.val)
             if mappedInjectedAttrs.hasKey(identName):
                 mappedInjectedAttrs[identName] =
                     mappedInjectedAttrs[identName] & injectedAttr.name
             else:
-                mappedInjectedAttrs[$injectedAttr.val.ident] = @[injectedAttr.name]
+                mappedInjectedAttrs[strVal(injectedAttr.val)] = @[injectedAttr.name]
         else:
             quit "Error in tagdef!"
     

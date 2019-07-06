@@ -1,6 +1,11 @@
 Changelog
 =========
 
+v0.2.3
+------
+
+- Fixed to work with Nim 0.20.0.
+
 v0.2.2
 ------
 
