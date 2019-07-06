@@ -1,6 +1,6 @@
 # Package
 
-version       = "0.2.2"
+version       = "0.2.3"
 author        = "Felix Krause"
 description   = "macro-based HTML templating engine"
 license       = "WTFPL"
@@ -8,7 +8,7 @@ srcDir        = "src"
 
 # Dependencies
 
-requires "nim >= 0.11.3"
+requires "nim >= 0.20.0"
 
 # No longer needed - nimble install will suffice
 
