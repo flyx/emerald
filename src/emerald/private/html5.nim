@@ -3,7 +3,7 @@ import tagdef
 
 tag_list:
     global:
-        attributes = (accesskey, class, contenteditable, contextmenu, data, dir,
+        attributes = (accesskey, aria, class, contenteditable, contextmenu, data, dir,
                       draggable, dropzone, hidden, id, itemid, itemprop,
                       itemref, itemscope, itemtype, lang, spellcheck, style,
                       tabindex, title,
