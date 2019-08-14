@@ -266,15 +266,13 @@ proc process_block_replacements(content: NimNode,
                 if methodContext == nil:
                     quit_unknown(node[1], "block name", blockName)
                 else:
-                    var targetCotext: ParseContext = methodContext.copy()
-                    
                     var childMethodContext = methodContext.copy()
                     childMethodContext.cur_class = context.cur_class
                     childMethodContext.debug = context.debug
                     childMethodContext.class_instance = context.class_instance
-            
-                    targetCotext.adapt_to_child_class(context)
-            
+
+                    childMethodContext.adapt_to_child_class(context)
+
                     let streamName = genSym(nskParam, ":stream")
                     var procContent = write_proc_content(streamName, node[2],
                                                          childMethodContext)
