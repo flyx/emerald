@@ -776,8 +776,9 @@ proc parse_children(writer: StmtListWriter, context: ParseContext,
                 
                 var mixinCall = newCall(mixinSym, writer.streamName)
                 for i in 1 .. node[1].len - 1:
-                    mixinCall.add(node[1][i])
-                
+                    let replacedParam = copy_tree_replace_params(context,
+                            node[1][i])
+                    mixinCall.add(replacedParam)
                 for s in mixinLevel.call_content_syms:
                     mixinCall.add(newNimNode(nnkLambda).add(newEmptyNode(),
                             newEmptyNode(), newEmptyNode(), newNimNode(
