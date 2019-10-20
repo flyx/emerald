@@ -517,6 +517,23 @@ proc parse_tag(writer: StmtListWriter, context: ParseContext,
                             newCall(ident("$"),
                             copy_tree_replace_params(context, dataPair[1])))
                 added = true
+            if attrName == "aria":
+                if node[i][1].kind != nnkTableConstr:
+                    quit_invalid(node[i][1],
+                            "value kind for aria (expected table constructor)",
+                            node[i][1].kind)
+                for ariaPair in node[i][1].children:
+                    # this couldn't be a table constructor if this assertion
+                    # fails
+                    assert ariaPair.kind == nnkExprColonExpr
+                    if ariaPair[0].kind != nnkStrLit:
+                        quit_invalid(ariaPair[0],
+                                "key token (expected string literal)",
+                                ariaPair[0].kind)
+                    writer.add_attr_val("aria-" & ariaPair[0].strVal,
+                            newCall(ident("$"),
+                            copy_tree_replace_params(context, ariaPair[1])))
+                added = true
             if not added:
                 if is_bool_attr(attrName):
                     writer.add_bool_attr(attrName, node[i][1])
