@@ -31,6 +31,11 @@
                 </ul>
             </nav>
             <article>
+                <section class="unmaintained">
+                    <h2>Project Status</h2>
+                    <p>This was my very first Nim project, the goal was to test the versatility of Nim's macro system. It worked quite well.</p>
+                    <p>Since I never went on to actually do something with it, this is now just code I myself do not really know anymore. I also don't have the time to maintain the project, so it is <strong>unmaintained</strong>. Use at your own risk.</p>
+                </section>
                 <section>
                     <h2>About</h2>
                     <p>
@@ -66,67 +71,8 @@
                             template, and add content with child templates. emerald is
                             still able to check the whole resulting HTML structure.                        </li>
                     </ul>
-                    <div id="main-example"><div class="highlight"><pre><span class="k">proc </span><span class="nf">templ</span><span class="p">(</span><span class="n">youAreUsingEmerald</span><span class="p">:</span> <span class="kt">bool</span><span class="p">)</span> <span class="p">{.</span><span class="n">html_templ</span><span class="p">.}</span> <span class="o">=</span>
-  <span class="n">html</span><span class="p">(</span><span class="n">lang</span> <span class="o">=</span> <span class="s">&quot;en&quot;</span><span class="p">):</span>
-    <span class="n">head</span><span class="p">:</span>
-      <span class="n">title</span><span class="p">:</span> <span class="s">&quot;pageTitle&quot;</span>
-      <span class="n">script</span> <span class="p">(`</span><span class="k">type</span><span class="p">`</span> <span class="o">=</span> <span class="s">&quot;text/javascript&quot;</span><span class="p">):</span> <span class="s">&quot;&quot;&quot;</span>
-<span class="s">        if (foo) {</span>
-<span class="s">          bar(1 + 5)</span>
-<span class="s">        }</span>
-<span class="s">        &quot;&quot;&quot;</span>
-    <span class="n">body</span><span class="p">:</span>
-      <span class="n">h1</span><span class="p">:</span> <span class="s">&quot;Emerald - Nim HTML5 templating engine&quot;</span>
-      <span class="n">d</span><span class="p">.</span><span class="n">content</span><span class="p">:</span>
-        <span class="k">if</span> <span class="n">youAreUsingEmerald</span><span class="p">:</span>
-          <span class="n">p</span><span class="p">:</span> <span class="s">&quot;You are amazing&quot;</span><span class="p">;</span> <span class="n">br</span><span class="p">();</span> <span class="s">&quot;Continue.&quot;</span>
-        <span class="k">else</span><span class="p">:</span>
-          <span class="n">p</span><span class="p">:</span> <span class="s">&quot;Get on it!&quot;</span>
-        <span class="n">p</span><span class="p">:</span> <span class="s">&quot;&quot;&quot;</span>
-<span class="s">          Emerald is a macro-based type-safe</span>
-<span class="s">          templating engine which validates your</span>
-<span class="s">          HTML structure and relieves you from</span>
-<span class="s">          the ugly mess that HTML code is.</span>
-<span class="s">          &quot;&quot;&quot;</span>
-</pre></div>
-<div class="highlight"><pre><span class="cp">&lt;!DOCTYPE html&gt;</span>
-<span class="nt">&lt;html</span> <span class="na">xmlns=</span><span class="s">&quot;http://www.w3.org/1999/xhtml&quot;</span> <span class="na">lang=</span><span class="s">&quot;en&quot;</span> <span class="na">xml:lang=</span><span class="s">&quot;en&quot;</span><span class="nt">&gt;</span>
-    <span class="nt">&lt;head&gt;</span>
-        <span class="nt">&lt;title&gt;</span>pageTitle<span class="nt">&lt;/title&gt;</span>
-        <span class="nt">&lt;script </span><span class="na">type=</span><span class="s">&quot;text/javascript&quot;</span><span class="nt">&gt;</span><span class="k">if</span> <span class="p">(</span><span class="nx">foo</span><span class="p">)</span> <span class="p">{</span>
-            <span class="nx">bar</span><span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="mi">5</span><span class="p">)</span>
-            <span class="p">}</span><span class="nt">&lt;/script&gt;</span>
-    <span class="nt">&lt;/head&gt;</span>
-    <span class="nt">&lt;body&gt;</span>
-        <span class="nt">&lt;h1&gt;</span>Emerald - Nim HTML5 templating engine<span class="nt">&lt;/h1&gt;</span>
-        <span class="nt">&lt;div</span> <span class="na">class=</span><span class="s">&quot;content&quot;</span><span class="nt">&gt;</span>
-            <span class="nt">&lt;p&gt;</span>You are amazing<span class="nt">&lt;br/&gt;</span>Continue.<span class="nt">&lt;/p&gt;</span>
-            <span class="nt">&lt;p&gt;</span>Emerald is a macro-based type-safe
-                templating engine which validates your
-                HTML structure and relieves you from
-                the ugly mess that HTML code is.<span class="nt">&lt;/p&gt;</span>
-        <span class="nt">&lt;/div&gt;</span>
-    <span class="nt">&lt;/body&gt;</span>
-<span class="nt">&lt;/html&gt;</span>
-                
-</pre></div>
-</div>
+                    <div id="main-example"></div>
                     <p>To get started with emerald, have a look at the <a href="tutorial.html">tutorial</a> or learn it the hard way by reading the <a href="documentation.html">documentation</a>.</p>
-                </section>
-                <section>
-                    <h2>Project Status &amp; Contributing</h2>
-                    <p>emerald is currently under development. Its language
-                        definition is not finalized yet. All major features are
-                        implemented, but it is a bit rough around the edges. Every
-                        comment and suggestion how to improve it is welcome, just create
-                        an issue on GitHub. Of course, you can also fork emerald hack it
-                        yourself.</p>
-                    <p>This project has been started as proof-of-concept and to
-                        test Nim's macro capabilities. It does not have a stable release
-                        yet, it only compiles with Nim's development branch, and its
-                        implementation contains multiple workarounds for Nim VM bugs.
-                        Using it for any serious project is strongly discouraged. This
-                        may change in the future.</p>
                     <h2>Authors &amp; License</h2>
                     <p>emerald has been created by <a href="https://github.com/flyx">Felix Krause</a>, is licensed under the <a href="http://www.wtfpl.net">Do What the Fuck You Want to Public License</a> and can be forked on <a href="https://github.com/flyx/emerald">Github</a>.</p>
                 </section>

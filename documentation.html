@@ -74,27 +74,9 @@
                         the styling matters here: <code>http_equiv</code> is not the same as <code>httpEquiv</code>.</p>
                 </section>
                 <section>
-                    <figure><div class="highlight"><pre><span class="k">proc </span><span class="nf">templ</span><span class="p">(</span><span class="n">param</span><span class="p">:</span> <span class="kt">string</span><span class="p">)</span> <span class="p">{.</span><span class="n">html_templ</span><span class="p">.}</span> <span class="o">=</span>
-    <span class="c">#...</span>
-</pre></div>
-<figcaption>input...</figcaption></figure>
-                    <figure><div class="highlight"><pre><span class="k">type</span> <span class="n">templ</span> <span class="o">=</span> <span class="k">ref</span> <span class="k">object</span> <span class="k">of</span> <span class="n">RootObj</span>
-    <span class="n">param</span><span class="p">:</span> <span class="kt">string</span>
-
-<span class="k">proc </span><span class="nf">newTempl</span><span class="p">():</span> <span class="n">templ</span> <span class="o">=</span>
-    <span class="n">new</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
-
-<span class="k">method</span> <span class="n">render</span><span class="p">(</span><span class="n">obj</span><span class="p">:</span> <span class="n">templ_class</span><span class="p">,</span> <span class="n">s</span><span class="p">:</span> <span class="n">Stream</span><span class="p">)</span> <span class="o">=</span>
-    <span class="c">#...</span>
-</pre></div>
-<figcaption>... the resulting AST, visualized as Nim code ...</figcaption></figure>
-                    <figure><div class="highlight"><pre><span class="kd">var</span>
-    <span class="n">ss</span> <span class="o">=</span> <span class="n">newStringStream</span><span class="p">()</span>
-    <span class="n">myTempl</span> <span class="o">=</span> <span class="n">newTempl</span><span class="p">()</span>
-<span class="n">templ</span><span class="p">.</span><span class="n">param</span> <span class="o">=</span> <span class="s">&quot;foo&quot;</span>
-<span class="n">templ</span><span class="p">.</span><span class="n">render</span><span class="p">(</span><span class="n">ss</span><span class="p">)</span>
-</pre></div>
-<figcaption>... and how to use it in your code.</figcaption></figure>
+                    <figure><figcaption>input...</figcaption></figure>
+                    <figure><figcaption>... the resulting AST, visualized as Nim code ...</figcaption></figure>
+                    <figure><figcaption>... and how to use it in your code.</figcaption></figure>
                     <h2 id="interface">Interface</h2>
                     <p>The two macros <code>html_templ</code> and <code>html_mixin</code> are the main API of emerald. The only
                         other things that are publicly exposed are the filters that
@@ -118,19 +100,7 @@
                     <h3>
                         <code>html_mixin</code>
                     </h3>
-                    <figure><div class="highlight"><pre><span class="k">proc </span><span class="nf">wrapWithSection</span><span class="p">(</span><span class="n">title</span><span class="p">:</span> <span class="kt">string</span><span class="p">)</span> <span class="p">{.</span><span class="n">html_mixin</span><span class="p">.}</span> <span class="o">=</span>
-    <span class="n">section</span><span class="p">:</span>
-        <span class="n">h1</span><span class="p">:</span> <span class="n">title</span>
-        <span class="n">put</span> <span class="n">mixin_content</span><span class="p">()</span>
-
-<span class="k">proc </span><span class="nf">templ</span><span class="p">()</span> <span class="p">{.</span><span class="n">html_templ</span><span class="p">.}</span> <span class="o">=</span>
-    <span class="n">body</span><span class="p">:</span>
-        <span class="n">call_mixin</span> <span class="n">wrapWithSection</span><span class="p">(</span><span class="s">&quot;Overview&quot;</span><span class="p">):</span>
-            <span class="n">p</span><span class="p">:</span> <span class="s">&quot;Foo&quot;</span>
-        <span class="n">call_mixin</span> <span class="n">wrapWithSection</span><span class="p">(</span><span class="s">&quot;Details&quot;</span><span class="p">):</span>
-            <span class="n">p</span><span class="p">:</span> <span class="s">&quot;Bar&quot;</span>
-</pre></div>
-<figcaption>define and use a mixin</figcaption></figure>
+                    <figure><figcaption>define and use a mixin</figcaption></figure>
                     <p>This macro must also be applied to a proc that has no return
                         value. Parsing it will not produce any nodes in the resulting
                         AST; instead, it is parsed directly into the <code>render</code> proc at each place where it is called. There
@@ -146,30 +116,7 @@
                         mixin, emerald will exit with an error message.</p>
                 </section>
                 <section>
-                    <figure><div class="highlight"><pre><span class="k">proc </span><span class="nf">templ</span><span class="p">()</span> <span class="p">{.</span><span class="n">html_templ</span><span class="p">.}</span> <span class="o">=</span>
-    <span class="c"># a tag with a child block</span>
-    <span class="n">body</span><span class="p">:</span>
-        <span class="c"># a tag without a child block</span>
-        <span class="n">img</span><span class="p">(</span><span class="n">src</span><span class="o">=</span><span class="s">&quot;foo.png&quot;</span><span class="p">)</span>
-        
-        <span class="c"># a tag which has its content defined as</span>
-        <span class="c"># direct content</span>
-        <span class="n">strong</span><span class="p">(</span><span class="s">&quot;Content&quot;</span><span class="p">)</span>
-        
-        <span class="c"># a tag condensed into one line along with</span>
-        <span class="c"># two string literals</span>
-        <span class="s">&quot;foo&quot;</span><span class="p">;</span> <span class="n">br</span><span class="p">();</span> <span class="s">&quot;bar&quot;</span>
-        
-        <span class="c"># a &lt;div&gt; can be written as &quot;d&quot;</span>
-        <span class="n">d</span><span class="p">:</span>
-            <span class="c"># a tag with a class</span>
-            <span class="n">p</span><span class="p">.</span><span class="n">someClass</span><span class="p">:</span> <span class="s">&quot;Bar&quot;</span>
-            
-            <span class="c"># a tag with two classes that needs</span>
-            <span class="c"># to be escaped</span>
-            <span class="p">`</span><span class="k">object</span><span class="p">`.</span><span class="n">foo</span><span class="p">.</span><span class="n">bar</span><span class="p">:</span> <span class="s">&quot;Foo&quot;</span>
-</pre></div>
-<figcaption>using the tag syntax</figcaption></figure>
+                    <figure><figcaption>using the tag syntax</figcaption></figure>
                     <h2 id="tags">Tags</h2>
                     <p>In an HTML template, every standalone call is interpreted as
                         HTML tag. Standalone means that the call is not part of an
@@ -201,30 +148,7 @@
                         use such templates e.g. for AJAX-based websites.</p>
                 </section>
                 <section>
-                    <figure><div class="highlight"><pre><span class="k">proc </span><span class="nf">templ</span><span class="p">()</span> <span class="p">{.</span><span class="n">html_templ</span><span class="p">.}</span> <span class="o">=</span>
-    <span class="c"># required attribute; emerald will terminate</span>
-    <span class="c"># with an error if it&#39;s omitted</span>
-    <span class="n">html</span><span class="p">(</span><span class="n">lang</span><span class="o">=</span><span class="s">&quot;en&quot;</span><span class="p">):</span>
-        <span class="k">let</span> <span class="n">large</span> <span class="o">=</span> <span class="kp">false</span>
-        
-        <span class="c"># complex expression as value </span>
-        <span class="n">img</span><span class="p">(</span><span class="n">src</span><span class="o">=</span><span class="k">if</span> <span class="n">large</span><span class="p">:</span> <span class="s">&quot;foo-large.png&quot;</span>
-            <span class="k">else</span><span class="p">:</span> <span class="s">&quot;foo.png&quot;</span><span class="p">)</span>
-
-        <span class="c"># attribute name that must be escaped</span>
-        <span class="n">script</span><span class="p">(`</span><span class="k">type</span><span class="p">`</span><span class="o">=</span><span class="s">&quot;text/javascript&quot;</span><span class="p">,</span>
-               <span class="n">src</span><span class="o">=</span><span class="s">&quot;foo.js&quot;</span><span class="p">)</span>
-        
-        <span class="kd">var</span> <span class="n">myClass</span><span class="o">=</span><span class="s">&quot;active&quot;</span>
-        <span class="c"># defining classes with dot notation</span>
-        <span class="c"># and attribute</span>
-        <span class="n">d</span><span class="p">.</span><span class="n">main</span><span class="p">(</span><span class="n">class</span><span class="o">=</span><span class="n">myClass</span><span class="p">)</span>
-        
-        <span class="c"># defining data attributes</span>
-        <span class="k">const</span> <span class="n">varValue</span> <span class="o">=</span> <span class="s">&quot;value2&quot;</span>
-        <span class="n">d</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="p">{</span><span class="s">&quot;key1&quot;</span><span class="p">:</span> <span class="s">&quot;value1&quot;</span><span class="p">,</span> <span class="s">&quot;key2&quot;</span><span class="p">:</span> <span class="n">varValue</span><span class="p">})</span>
-</pre></div>
-<figcaption>set attribute values</figcaption></figure>
+                    <figure><figcaption>set attribute values</figcaption></figure>
                     <h2 id="attributes">Attributes</h2>
                     <p>For each tag, attributes can be specified in the brackets of
                         the tag call. The name of the attribute comes first, followed by
@@ -254,31 +178,7 @@
                         expression. The example shows how to set data attributes.</p>
                 </section>
                 <section>
-                    <figure><div class="highlight"><pre><span class="k">proc </span><span class="nf">templ</span><span class="p">()</span> <span class="p">{.</span><span class="n">html_templ</span><span class="p">.}</span> <span class="o">=</span>
-    <span class="c"># simple string literal</span>
-    <span class="s">&quot;Foobar&quot;</span>
-    
-    <span class="c"># triple quoted string literal</span>
-    <span class="s">&quot;&quot;&quot;Lorem ipsum dolor sit amet,</span>
-<span class="s">    consectetur adipiscing elit. Quisque</span>
-<span class="s">    nibh leo, tincidunt in feugiat ac,</span>
-<span class="s">    egestas ac libero.&quot;&quot;&quot;</span>    
-    
-    <span class="c"># result of an infix call</span>
-    <span class="mi">2</span> <span class="o">+</span> <span class="mi">2</span>
-    
-    <span class="kd">var</span> <span class="n">a</span> <span class="o">=</span> <span class="s">&quot;foo&quot;</span>
-    <span class="c"># the value of a variable</span>
-    <span class="n">a</span>
-    
-    <span class="c"># the value of a proc call</span>
-    <span class="n">put</span> <span class="n">getDateStr</span><span class="p">()</span>
-    
-    <span class="kd">var</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">1</span>
-    <span class="c"># call a proc without a return value</span>
-    <span class="k">discard</span> <span class="n">inc</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
-</pre></div>
-<figcaption>creating text content</figcaption></figure>
+                    <figure><figcaption>creating text content</figcaption></figure>
                     <h2 id="content">Text Content</h2>
                     <p>Text content is generated by every expression that is used as
                         a statement, excluding calls (which are used for creating HTML
@@ -297,22 +197,7 @@
                         chain can be customized to your needs, see the next section.</p>
                 </section>
                 <section>
-                    <figure><div class="highlight"><pre><span class="k">proc </span><span class="nf">templ</span><span class="p">()</span> <span class="p">{.</span><span class="n">html_templ</span><span class="p">.}</span> <span class="o">=</span>
-    <span class="c"># define variables</span>
-    <span class="k">const</span> <span class="n">max</span> <span class="o">=</span> <span class="mi">5</span>
-    <span class="kd">var</span> <span class="n">current</span> <span class="o">=</span> <span class="mi">2</span>
-    
-    <span class="n">ul</span><span class="p">:</span>
-        <span class="c"># use a for loop</span>
-        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="mi">0</span> <span class="p">..</span> <span class="n">val</span><span class="p">:</span>
-            <span class="n">li</span><span class="p">:</span>
-                <span class="c"># use if</span>
-                <span class="k">if</span> <span class="n">i</span> <span class="o">==</span> <span class="n">current</span><span class="p">:</span>
-                    <span class="n">i</span>
-                <span class="k">else</span><span class="p">:</span>
-                    <span class="n">a</span><span class="p">(</span><span class="n">href</span><span class="o">=$</span><span class="n">i</span> <span class="o">&amp;</span> <span class="s">&quot;.html&quot;</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
-</pre></div>
-<figcaption>using control structures</figcaption></figure>
+                    <figure><figcaption>using control structures</figcaption></figure>
                     <h2 id="control">Control structures</h2>
                     <p>Most of Nim's control structures are directly usable in
                         emerald: You can use <code>if</code>, <code>case</code> and <code>while</code> just like you would in Nim code.
@@ -368,31 +253,7 @@
                         the part of the template outside the current HTML tag.</p>
                 </section>
                 <section>
-                    <figure><div class="highlight"><pre><span class="k">proc </span><span class="nf">templ</span><span class="p">()</span> <span class="p">{.</span><span class="n">html_templ</span><span class="p">.}</span> <span class="o">=</span>
-    <span class="n">html</span><span class="p">(</span><span class="n">lang</span><span class="o">=</span><span class="s">&quot;en&quot;</span><span class="p">):</span>
-        <span class="n">head</span><span class="p">:</span>
-            <span class="c"># disable all filters</span>
-            <span class="p">{.</span> <span class="n">filters</span> <span class="o">=</span> <span class="kp">nil</span> <span class="p">.}</span>
-            <span class="s">&quot;&lt;title&gt;Title&lt;/title&gt;&quot;</span>
-        <span class="n">body</span><span class="p">:</span>
-            <span class="c"># escape_html is active here, because</span>
-            <span class="c"># we left the tag &quot;head&quot;</span>
-            
-            <span class="n">d</span><span class="p">:</span>
-                <span class="c"># parse the following content with</span>
-                <span class="c"># pygments.</span>
-                <span class="p">{.</span> <span class="n">filters</span> <span class="o">=</span> <span class="n">pygmentize</span><span class="p">(</span><span class="s">&quot;nim&quot;</span><span class="p">)</span> <span class="p">.}</span>
-                <span class="s">&quot;&quot;&quot;</span>
-<span class="s">proc foo() =</span>
-<span class="s">    bar()</span>
-<span class="s">                &quot;&quot;&quot;</span>
-                <span class="c"># still use pygmentize, but escape</span>
-                <span class="c"># the HTML characters coming from it</span>
-                <span class="p">{.</span> <span class="n">filters</span> <span class="o">=</span> <span class="n">filters</span> <span class="o">&amp;</span> <span class="n">escape_html</span><span class="p">()</span> <span class="p">.}</span>
-
-                <span class="c"># ...</span>
-</pre></div>
-<figcaption>modifying the filter chain</figcaption></figure>
+                    <figure><figcaption>modifying the filter chain</figcaption></figure>
                     <h2 id="filters">Filters</h2>
                     <p>emerald maintains a filter chain while compiling your
                         template. All text content is processed by the current filter
@@ -430,13 +291,7 @@
                             You have to include a pygments css theme in order to
                             actually see the syntax highlighting in the rendered output.</dd>
                     </dl>
-                    <figure><div class="highlight"><pre><span class="k">proc </span><span class="nf">remove_vowels</span><span class="p">(</span><span class="n">target</span><span class="p">:</span> <span class="n">Stream</span><span class="p">,</span> <span class="n">value</span> <span class="p">:</span> <span class="kt">string</span><span class="p">)</span> <span class="o">=</span>
-    <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">value</span><span class="p">:</span>
-        <span class="k">case</span> <span class="n">c</span>
-        <span class="k">of</span> <span class="sc">&#39;a&#39;</span><span class="p">,</span> <span class="sc">&#39;e&#39;</span><span class="p">,</span> <span class="sc">&#39;i&#39;</span><span class="p">,</span> <span class="sc">&#39;o&#39;</span><span class="p">,</span> <span class="sc">&#39;u&#39;</span><span class="p">:</span> <span class="k">discard</span>
-        <span class="k">else</span><span class="p">:</span> <span class="n">target</span><span class="p">.</span><span class="n">write</span><span class="p">(</span><span class="n">c</span><span class="p">)</span>
-</pre></div>
-<figcaption>a simple filter</figcaption></figure>
+                    <figure><figcaption>a simple filter</figcaption></figure>
                     <h3>Writing Your Own Filters</h3>
                     <p>Filters are simple procs. If you want to write your own
                         filter, you just implement it as proc. It should look like 
@@ -451,22 +306,7 @@
                     <p>When the filter gets called, you should process <code>value</code> and write the result to <code>target</code>. That's all.</p>
                 </section>
                 <section>
-                    <figure><div class="highlight"><pre><span class="k">proc </span><span class="nf">parent</span><span class="p">(</span><span class="n">title</span><span class="p">:</span> <span class="kt">string</span><span class="p">,</span>
-            <span class="n">homeUrl</span><span class="p">:</span> <span class="kt">string</span><span class="p">)</span> <span class="p">{.</span> <span class="n">html_templ</span> <span class="p">.}</span> <span class="o">=</span>
-    <span class="n">html</span><span class="p">(</span><span class="n">lang</span><span class="o">=</span><span class="s">&quot;en&quot;</span><span class="p">):</span>
-        <span class="n">head</span><span class="p">:</span>
-            <span class="n">title</span><span class="p">:</span> <span class="n">title</span>
-        <span class="n">body</span><span class="p">:</span>
-            <span class="n">h1</span><span class="p">:</span>
-                <span class="n">a</span><span class="p">(</span><span class="n">href</span><span class="o">=</span><span class="n">homeUrl</span><span class="p">):</span> <span class="n">title</span>
-            <span class="k">block</span> <span class="n">content</span><span class="p">:</span> <span class="k">discard</span>
-
-<span class="k">proc </span><span class="nf">home</span><span class="p">()</span> <span class="p">{.</span> <span class="n">html_templ</span><span class="p">:</span> <span class="n">parent</span> <span class="p">.}</span> <span class="o">=</span>
-    <span class="n">title</span> <span class="o">=</span> <span class="s">&quot;Home&quot;</span>
-    <span class="n">replace</span> <span class="n">content</span><span class="p">:</span>
-        <span class="n">p</span><span class="p">:</span> <span class="s">&quot;Content&quot;</span>
-</pre></div>
-<figcaption>inheriting from a template</figcaption></figure>
+                    <figure><figcaption>inheriting from a template</figcaption></figure>
                     <h2 id="inheritance">Template Inheritance</h2>
                     <p>You can inherit from templates by specifying the parent
                         template when declaring the child template. This will make the

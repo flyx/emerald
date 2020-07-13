@@ -47,24 +47,14 @@
                     <p>Sounds easy enough, doesn't it? Let's look at the details.</p>
                 </section>
                 <section>
-                    <figure><div class="highlight"><pre><span class="kn">import</span> <span class="n">emerald</span>
-</pre></div>
-<figcaption>import it.</figcaption></figure>
+                    <figure><figcaption>import it.</figcaption></figure>
                     <h2>1. Import <code>emerald</code></h2>
                     <p>The <code>emerald</code> module exports everything you need
                         to use emerald: The <code>streams</code> module from the
                         standard library, and the emerald modules <code>html</code> and <code>filters</code>.</p>
                 </section>
                 <section>
-                    <figure><div class="highlight"><pre><span class="k">proc </span><span class="nf">templ</span><span class="p">(</span><span class="n">pageTitle</span><span class="p">:</span> <span class="kt">string</span><span class="p">)</span> <span class="p">{.</span><span class="n">html_templ</span><span class="p">.}</span> <span class="o">=</span>
-    <span class="n">html</span><span class="p">(</span><span class="n">lang</span><span class="o">=</span><span class="s">&quot;en&quot;</span><span class="p">):</span>
-        <span class="n">head</span><span class="p">:</span>
-            <span class="n">title</span><span class="p">:</span> <span class="n">pageTitle</span>
-        <span class="n">body</span><span class="p">:</span>
-            <span class="n">p</span><span class="p">:</span> <span class="s">&quot;Content&quot;</span><span class="p">;</span> <span class="n">br</span><span class="p">();</span> <span class="s">&quot;More content&quot;</span>
-                
-</pre></div>
-<figcaption>write a template.</figcaption></figure>
+                    <figure><figcaption>write a template.</figcaption></figure>
                     <h2>2. Write templates</h2>
                     <p>You start writing a template with a proc header. The name
                         of the proc is the name of your template. The template may take
@@ -76,20 +66,7 @@
                         expression, or put more simply: If it stands alone on its line.
                         Calls may take two forms: Either a simple call (e.g. <code>br()</code>) or a call with a child block (e.g. <code>head:</code>). The example shows you how this looks in
                         action.</p>
-                    <figure><div class="highlight"><pre><span class="k">proc </span><span class="nf">templ</span><span class="p">(</span><span class="n">numItems</span><span class="p">:</span> <span class="kt">int</span><span class="p">)</span> <span class="p">{.</span><span class="n">html_templ</span><span class="p">.}</span> <span class="o">=</span>
-    <span class="n">html</span><span class="p">(</span><span class="n">lang</span><span class="o">=</span><span class="s">&quot;en&quot;</span><span class="p">):</span>
-        <span class="k">const</span> <span class="n">myTitle</span> <span class="o">=</span> <span class="s">&quot;Title&quot;</span>
-        <span class="n">head</span><span class="p">:</span>
-            <span class="n">title</span><span class="p">:</span> <span class="n">myTitle</span>
-        <span class="n">body</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">numItems</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
-                <span class="n">ul</span><span class="p">:</span>
-                    <span class="kd">var</span> <span class="n">content</span> <span class="o">=</span> <span class="s">&quot;x&quot;</span>
-                    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="mi">1</span> <span class="p">..</span> <span class="n">items</span><span class="p">:</span>
-                        <span class="n">li</span><span class="p">:</span> <span class="n">content</span>
-                        <span class="n">content</span> <span class="o">=</span> <span class="n">content</span> <span class="o">&amp;</span> <span class="s">&quot;x&quot;</span>
-</pre></div>
-<figcaption>use variables and control structures.</figcaption></figure>
+                    <figure><figcaption>use variables and control structures.</figcaption></figure>
                     <p>You can use <code>if</code>, <code>case</code> and <code>for</code> loops inside templates. You can also define and
                         use variables with <code>var</code>, <code>let</code> and <code>const</code>. Every expression that stands alone on a line
                         and is not a call will be transformed to a string and written to
@@ -104,17 +81,7 @@
                         use any expression to define the attribute's value. Some HTML
                         attributes have names that are also keywords in Nim. When you
                         set them, you need to use backticks around the name (e.g. <code>`type`</code>).</p>
-                    <figure><div class="highlight"><pre><span class="k">proc </span><span class="nf">templ</span><span class="p">(</span><span class="n">numItems</span><span class="p">:</span> <span class="kt">int</span><span class="p">)</span> <span class="p">{.</span><span class="n">html_templ</span><span class="p">.}</span> <span class="o">=</span>
-    <span class="n">html</span><span class="p">(</span><span class="n">lang</span><span class="o">=</span><span class="s">&quot;en&quot;</span><span class="p">):</span>
-        <span class="kd">var</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">1</span>
-        <span class="n">ul</span><span class="p">:</span>
-            <span class="n">li</span><span class="p">:</span> <span class="n">i</span>
-            <span class="k">discard</span> <span class="n">inc</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
-            <span class="n">li</span><span class="p">:</span> <span class="n">i</span>
-            <span class="n">li</span><span class="p">:</span>
-                <span class="n">put</span> <span class="n">substr</span><span class="p">(</span><span class="s">&quot;foobar&quot;</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
-</pre></div>
-<figcaption>use <code>put</code> and <code>discard</code> to call procs.</figcaption></figure>
+                    <figure><figcaption>use <code>put</code> and <code>discard</code> to call procs.</figcaption></figure>
                     <p>Be aware that while emerald allows you to embed quite much
                         business logic in your template, you shouldn't embed program
                         logic in the template unless it's absolutely necessary. Other
@@ -122,20 +89,7 @@
                         because the template is not the place for it. emerald allows it
                         because it doesn't want to stand in your way, so it's up to you
                         to use its features with care.</p>
-                    <figure><div class="highlight"><pre><span class="k">proc </span><span class="nf">mySection</span><span class="p">(</span><span class="n">title</span><span class="p">:</span> <span class="kt">string</span><span class="p">)</span> <span class="p">{.</span><span class="n">html_mixin</span><span class="p">.}</span> <span class="o">=</span>
-    <span class="n">section</span><span class="p">:</span>
-        <span class="n">h1</span><span class="p">:</span> <span class="n">title</span>
-        <span class="n">put</span> <span class="n">mixin_content</span><span class="p">()</span>
-
-<span class="k">proc </span><span class="nf">templ</span><span class="p">(</span><span class="n">numItems</span><span class="p">:</span> <span class="kt">int</span><span class="p">)</span> <span class="p">{.</span><span class="n">html_templ</span><span class="p">.}</span> <span class="o">=</span>
-    <span class="n">html</span><span class="p">(</span><span class="n">lang</span><span class="o">=</span><span class="s">&quot;en&quot;</span><span class="p">):</span>
-        <span class="n">body</span><span class="p">:</span>
-            <span class="n">call_mixin</span> <span class="n">mySection</span><span class="p">(</span><span class="s">&quot;First section&quot;</span><span class="p">):</span>
-                <span class="n">p</span><span class="p">:</span> <span class="s">&quot;Content&quot;</span>
-            <span class="n">call_mixin</span> <span class="n">mySection</span><span class="p">(</span><span class="s">&quot;Second section&quot;</span><span class="p">):</span>
-                <span class="n">p</span><span class="p">:</span> <span class="s">&quot;More content&quot;</span>
-</pre></div>
-<figcaption>define and use mixins.</figcaption></figure>
+                    <figure><figcaption>define and use mixins.</figcaption></figure>
                     <p>As any standalone call will create an HTML tag, emerald
                         provides a special syntax to actually call procs: Use the
                         familiar <code>discard</code> command to call a proc
@@ -152,13 +106,7 @@
                         sense. But you can call mixins from within mixins.</p>
                 </section>
                 <section>
-                    <figure><div class="highlight"><pre><span class="kd">var</span>
-    <span class="n">ss</span> <span class="o">=</span> <span class="n">newStringStream</span><span class="p">()</span>
-    <span class="n">myTempl</span> <span class="o">=</span> <span class="n">newTempl</span><span class="p">()</span>
-<span class="n">myTempl</span><span class="p">.</span><span class="n">numItems</span> <span class="o">=</span> <span class="mi">3</span>
-<span class="n">myTempl</span><span class="p">.</span><span class="n">render</span><span class="p">(</span><span class="n">ss</span><span class="p">)</span>
-</pre></div>
-<figcaption>call your template.</figcaption></figure>
+                    <figure><figcaption>call your template.</figcaption></figure>
                     <h2>3. Call your templates</h2>
                     <p>While you write your template as proc, it isn't a proc
                         anymore after emerald has parsed it. Instead, it is an object

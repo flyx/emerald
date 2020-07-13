@@ -164,3 +164,7 @@ footer {
 footer p {
     margin: 0;
 }
+.unmaintained {
+    padding: .75em;
+    background: #c53;
+}
