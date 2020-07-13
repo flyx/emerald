@@ -5,6 +5,12 @@ layout.sites.add((title: "Home", url: "index.html", anchors: @[]))
 proc home*() {. html_templ: layout .} =
     title = "Home"
     replace content:
+        section(class="unmaintained"):
+            h2: "Project Status"
+            p:
+              """This was my very first Nim project, the goal was to test the versatility of Nim's macro system. It worked quite well."""
+            p:
+              """Since I never went on to actually do something with it, this is now just code I myself do not really know anymore. I also don't have the time to maintain the project, so it is """; strong("unmaintained"); """. Use at your own risk."""
         section:
             h2: "About"
             p:
@@ -89,22 +95,6 @@ proc templ(youAreUsingEmerald: bool) {.html_templ.} =
                 a(href="tutorial.html", "tutorial")
                 " or learn it the hard way by reading the "
                 a(href="documentation.html", "documentation"); "."
-        section:
-            h2: "Project Status & Contributing"
-            p:
-                """emerald is currently under development. Its language
-                definition is not finalized yet. All major features are
-                implemented, but it is a bit rough around the edges. Every
-                comment and suggestion how to improve it is welcome, just create
-                an issue on GitHub. Of course, you can also fork emerald hack it
-                yourself."""
-            p:
-                """This project has been started as proof-of-concept and to
-                test Nim's macro capabilities. It does not have a stable release
-                yet, it only compiles with Nim's development branch, and its
-                implementation contains multiple workarounds for Nim VM bugs.
-                Using it for any serious project is strongly discouraged. This
-                may change in the future."""
             h2: "Authors & License"
             p:
                 "emerald has been created by "
